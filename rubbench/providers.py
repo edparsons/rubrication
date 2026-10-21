@@ -1,0 +1,131 @@
+"""Model providers behind one small interface, so every study runs the same loop on every model.
+
+  anthropic  Anthropic Messages API            env: ANTHROPIC_API_KEY
+  openai     OpenAI Chat Completions API       env: OPENAI_API_KEY
+  compat     any OpenAI-compatible endpoint     env: COMPAT_BASE_URL, COMPAT_API_KEY
+             (open-weights models served by vLLM, Together, Fireworks, etc.)
+
+A conversation object holds provider-specific message history. The loop only uses:
+  conv = provider.start(prompt, tools)      tools: list of {name, description, input_schema}
+  turn = conv.step()                        -> Turn(texts, calls, usage, done)
+  conv.add_results([(call_id, output_str)])
+  provider.chat(list_of_text_messages)      -> (text, usage)   for tool-free multi-turn (Study 3)
+"""
+import json
+import os
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Turn:
+    texts: list = field(default_factory=list)
+    calls: list = field(default_factory=list)   # (id, name, input_dict)
+    usage: dict = field(default_factory=dict)
+    done: bool = True
+
+
+# ------------------------------------------------------------------ Anthropic
+class AnthropicProvider:
+    def __init__(self, model, client=None, max_tokens=4096):
+        if client is None:
+            import anthropic
+            client = anthropic.Anthropic()
+        self.client, self.model, self.max_tokens = client, model, max_tokens
+
+    def start(self, prompt, tools):
+        return _AnthropicConv(self, prompt, tools)
+
+    def chat(self, messages):
+        r = self.client.messages.create(model=self.model, max_tokens=self.max_tokens, messages=messages)
+        text = "".join(b.text for b in r.content if b.type == "text")
+        return text, {"input": r.usage.input_tokens, "output": r.usage.output_tokens}
+
+
+class _AnthropicConv:
+    def __init__(self, p, prompt, tools):
+        self.p, self.tools = p, tools
+        self.messages = [{"role": "user", "content": prompt}]
+
+    def step(self):
+        kw = dict(model=self.p.model, max_tokens=self.p.max_tokens, messages=self.messages)
+        if self.tools:
+            kw["tools"] = self.tools
+        r = self.p.client.messages.create(**kw)
+        self.messages.append({"role": "assistant", "content": [b.model_dump() for b in r.content]})
+        t = Turn(usage={"input": r.usage.input_tokens, "output": r.usage.output_tokens}, done=r.stop_reason != "tool_use")
+        for b in r.content:
+            if b.type == "text":
+                t.texts.append(b.text)
+            elif b.type == "tool_use":
+                t.calls.append((b.id, b.name, dict(b.input)))
+        return t
+
+    def add_results(self, results):
+        self.messages.append({"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": cid, "content": out} for cid, out in results]})
+
+
+# ------------------------------------------------------------------ OpenAI / compatible
+class OpenAIProvider:
+    token_param = "max_completion_tokens"   # current OpenAI models
+
+    def __init__(self, model, client=None, base_url=None, api_key=None, max_tokens=4096):
+        if client is None:
+            import openai
+            client = openai.OpenAI(base_url=base_url, api_key=api_key) if base_url else openai.OpenAI()
+        self.client, self.model, self.max_tokens = client, model, max_tokens
+
+    def _create(self, messages, tools=None):
+        kw = dict(model=self.model, messages=messages)
+        kw[self.token_param] = self.max_tokens
+        if tools:
+            kw["tools"] = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
+                                                             "parameters": t["input_schema"]}} for t in tools]
+        return self.client.chat.completions.create(**kw)
+
+    def start(self, prompt, tools):
+        return _OpenAIConv(self, prompt, tools)
+
+    def chat(self, messages):
+        r = self._create(messages)
+        return r.choices[0].message.content or "", {"input": r.usage.prompt_tokens, "output": r.usage.completion_tokens}
+
+
+class CompatProvider(OpenAIProvider):
+    token_param = "max_tokens"              # most OpenAI-compatible servers
+
+    def __init__(self, model, client=None, max_tokens=4096):
+        super().__init__(model, client=client, base_url=os.environ.get("COMPAT_BASE_URL"),
+                         api_key=os.environ.get("COMPAT_API_KEY"), max_tokens=max_tokens)
+
+
+class _OpenAIConv:
+    def __init__(self, p, prompt, tools):
+        self.p, self.tools = p, tools
+        self.messages = [{"role": "user", "content": prompt}]
+
+    def step(self):
+        r = self.p._create(self.messages, self.tools)
+        m = r.choices[0].message
+        entry = {"role": "assistant", "content": m.content or ""}
+        calls = []
+        for tc in (m.tool_calls or []):
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            calls.append((tc.id, tc.function.name, args))
+        if calls:
+            entry["tool_calls"] = [{"id": c[0], "type": "function",
+                                    "function": {"name": c[1], "arguments": json.dumps(c[2])}} for c in calls]
+        self.messages.append(entry)
+        return Turn(texts=[m.content] if m.content else [], calls=calls,
+                    usage={"input": r.usage.prompt_tokens, "output": r.usage.completion_tokens}, done=not calls)
+
+    def add_results(self, results):
+        for cid, out in results:
+            self.messages.append({"role": "tool", "tool_call_id": cid, "content": out})
+
+
+def make_provider(name, model):
+    return {"anthropic": AnthropicProvider, "openai": OpenAIProvider, "compat": CompatProvider}[name](model)
