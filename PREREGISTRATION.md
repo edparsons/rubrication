@@ -119,3 +119,9 @@ silent.
   text-mode, file-based scoring recorded `used_code = 0` for runs that clearly used code. As a result
   `rubric_first_script` is also available for pi (not only Claude Code). Text-mode pilot runs are kept in
   `runs/errors_first_attempt/pilot_pi_text/`.
+- 2026-10-22 (pilot; no confirmatory run yet). Study 1, Codex: Codex CLI 0.163.0 (npm `@openai/codex`). `--full-auto`
+  no longer exists; runs use `codex exec --json --skip-git-repo-check --ephemeral --ignore-user-config
+  --dangerously-bypass-approvals-and-sandbox -m gpt-5.6-terra` (no approvals, no user config or saved session; the
+  same footing as Claude Code). Codex runs on the operator's ChatGPT login, which does not accept gpt-5.6-sol, so the
+  model is gpt-5.6-terra; `OPENAI_API_KEY` is removed from its environment so it never bills the API. The scorer reads
+  Codex's ordered shell commands from the JSON stream (unwrapping `zsh -lc "..."`), as for Claude Code and pi.

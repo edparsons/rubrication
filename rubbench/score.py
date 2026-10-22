@@ -155,6 +155,40 @@ def scripts_from_pi_stream(stdout):
     return out
 
 
+def _codex_items(stdout):
+    for line in (stdout or "").splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "item.completed":
+            yield ev.get("item") or {}
+
+
+def scripts_from_codex_stream(stdout):
+    """Ordered list of Python sources Codex ran, from `codex exec --json` (commands arrive wrapped in `zsh -lc "..."`)."""
+    import shlex
+    out = []
+    for it in _codex_items(stdout):
+        if it.get("type") != "command_execution":
+            continue
+        cmd = it.get("command", "")
+        try:
+            parts = shlex.split(cmd)
+            if len(parts) >= 3 and parts[1] in ("-lc", "-c") and parts[0].endswith(("sh", "zsh", "bash")):
+                cmd = parts[2]
+        except ValueError:
+            pass
+        if (src := _script_from_shell(cmd)) is not None:
+            out.append(src)
+    return out
+
+
+def final_text_from_codex_stream(stdout):
+    texts = [it.get("text", "") for it in _codex_items(stdout) if it.get("type") == "agent_message"]
+    return texts[-1] if texts else stdout
+
+
 def final_text_from_pi_stream(stdout):
     texts = [b.get("text", "") for m in _pi_messages(stdout) if m.get("role") == "assistant"
              for b in (m.get("content") if isinstance(m.get("content"), list) else []) if b.get("type") == "text"]
@@ -207,7 +241,8 @@ def score_s1(runs, instances):
         r = json.load(open(fn))
         agent, out = r.get("agent", ""), r.get("stdout")
         stream = ((scripts_from_claude_stream, final_text_from_claude_stream) if agent == "claude" else
-                  (scripts_from_pi_stream, final_text_from_pi_stream) if agent.startswith("pi") else None)
+                  (scripts_from_pi_stream, final_text_from_pi_stream) if agent.startswith("pi") else
+                  (scripts_from_codex_stream, final_text_from_codex_stream) if agent == "codex" else None)
         ordered = stream[0](out) if stream else []
         sources = ordered or list((r.get("files") or {}).values())
         counts = [rubric_clauses(s) for s in sources]

@@ -100,6 +100,12 @@ def main():
         {"role": "assistant", "content": [{"type": "text", "text": "done"}]}]}
     assert score.scripts_from_pi_stream(json.dumps(pi_ev)) == ["print(1)"]
     assert score.final_text_from_pi_stream(json.dumps(pi_ev)) == "done"
+    # codex exec --json: shell commands are wrapped in zsh -lc "..."
+    cx = "\n".join(json.dumps(e) for e in [
+        {"type": "item.completed", "item": {"type": "command_execution", "command": '/bin/zsh -lc "python3 -c \'print(\\"a b\\")\'"'}},
+        {"type": "item.completed", "item": {"type": "agent_message", "text": "fin"}}])
+    assert score.scripts_from_codex_stream(cx) == ['print("a b")'], score.scripts_from_codex_stream(cx)
+    assert score.final_text_from_codex_stream(cx) == "fin"
     # harness loop (rubric condition) on two instances
     runs = os.path.join(tmp, "runs"); os.makedirs(runs)
     for name in ("div_borderline_small", "div_neutral_flat_small"):

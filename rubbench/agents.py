@@ -22,8 +22,10 @@ AGENT_CMDS = {
     # Claude Code headless mode; stream-json keeps every tool call (Bash/Write inputs) in the log.
     "claude": ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
                "--dangerously-skip-permissions", "--model", "claude-opus-5-5"],
-    # OpenAI Codex CLI non-interactive mode (verify flags for your installed version).
-    "codex": ["codex", "exec", "--full-auto", "{prompt}"],
+    # OpenAI Codex CLI 0.163 non-interactive mode (--full-auto no longer exists). No approvals or sandbox (as for
+    # Claude Code), no user config or saved session; --json logs every shell command for the scorer.
+    "codex": ["codex", "exec", "--json", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+              "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-5.6-terra", "{prompt}"],
     # pi (pi.dev) on LunaRoute open-weights models; built-in tools only, no user skills/context/session files;
     # --mode json logs every tool call so the scorer can recover inline scripts, as for Claude Code.
     **{f"pi-{k}": ["pi", "-p", "--mode", "json", "--provider", "lunaroute", "--model", m, "--tools", "read,bash,edit,write",
@@ -45,6 +47,9 @@ def run(agent, inst, seed, timeout=1800):
         # fresh, empty config dir per run: default tools, none of the operator's plugins, hooks, memory or settings
         cfg = tempfile.mkdtemp(prefix="rub1_cfg_")
         env = {**os.environ, "CLAUDE_CONFIG_DIR": cfg}
+    elif agent == "codex":
+        # runs on the operator's ChatGPT login (~/.codex/auth.json), never the API key used for Studies 2-4
+        env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
     try:
         r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout, env=env,
                            stdin=subprocess.DEVNULL)
