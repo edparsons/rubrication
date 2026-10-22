@@ -11,7 +11,8 @@ from collections import defaultdict
 
 # input, output, cache read, cache write. gpt-5.6-sol: promo rate to 2026-11-21 (then 5 / 30); harness does not log
 # OpenAI cached tokens, so its input is priced uncached (an upper bound). LunaRoute is a flat subscription.
-PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20, 5.0), "gpt-5.6-sol": (4.0, 20.0, 4.0, 4.0)}
+PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20, 5.0), "gpt-5.6-sol": (4.0, 20.0, 4.0, 4.0),
+          "gpt-5.6-terra": (2.0, 12.0, 0.20, 2.5)}   # terra: Codex on the API key (cache write priced at 1.25x input)
 SOL_LONG = 272_000   # sol: prompts above this bill 2x input and 1.5x output for the whole request
 
 
@@ -26,7 +27,22 @@ def request_cost(model, u):
 
 
 def run_cost(r):
-    if "agent" in r:   # Study 1: Claude Code reports its own cost; pi runs on LunaRoute; codex not priced here
+    if r.get("agent") == "codex":   # ChatGPT-login runs are not API-billed; API runs priced from turn usage
+        if r.get("codex_auth") != "api":
+            return 0.0
+        tot = 0.0
+        for line in (r.get("stdout") or "").splitlines():
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if ev.get("type") == "turn.completed":
+                u = ev.get("usage") or {}
+                tot += request_cost("gpt-5.6-terra", {"input": u.get("input_tokens", 0), "output": u.get("output_tokens", 0),
+                                                      "cache_read": u.get("cached_input_tokens", 0),
+                                                      "cache_write": u.get("cache_write_input_tokens", 0)})
+        return tot
+    if "agent" in r:   # Study 1: Claude Code reports its own cost; pi runs on LunaRoute
         for line in (r.get("stdout") or "").splitlines():
             try:
                 ev = json.loads(line)

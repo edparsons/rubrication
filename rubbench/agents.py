@@ -39,7 +39,7 @@ AGENT_CMDS = {
 CONTEXT_DIR = os.path.join(os.path.dirname(__file__), "contexts")
 
 
-def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none"):
+def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none", codex_auth="chatgpt"):
     family = os.path.basename(inst).split("_")[0]
     work = tempfile.mkdtemp(prefix=f"rub1_{agent}_")
     shutil.copy(data_file(inst), work)
@@ -57,8 +57,14 @@ def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none"):
         cfg = tempfile.mkdtemp(prefix="rub1_cfg_")
         env = {**os.environ, "CLAUDE_CONFIG_DIR": cfg}
     elif agent == "codex":
-        # runs on the operator's ChatGPT login (~/.codex/auth.json), never the API key used for Studies 2-4
         env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        if codex_auth == "api":
+            # fresh CODEX_HOME logged in with the API key; the operator's ~/.codex ChatGPT login is untouched
+            cfg = tempfile.mkdtemp(prefix="rub1_codexhome_")
+            env["CODEX_HOME"] = cfg
+            subprocess.run(["codex", "login", "--with-api-key"], input=os.environ["OPENAI_API_KEY"], text=True,
+                           env=env, capture_output=True, check=True)
+        # else: the operator's ChatGPT login (~/.codex/auth.json)
     try:
         r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout, env=env,
                            stdin=subprocess.DEVNULL)
@@ -72,7 +78,7 @@ def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none"):
     if cfg:
         shutil.rmtree(cfg, ignore_errors=True)
     return dict(instance=os.path.basename(inst), family=family, agent=agent, seed=seed, prompt=prompt_id,
-                context=context, returncode=code,
+                context=context, codex_auth=codex_auth if agent == "codex" else None, returncode=code,
                 stdout=stdout, stderr=stderr[-5000:], files=scripts)
 
 
@@ -86,6 +92,8 @@ def main():
     ap.add_argument("--match", nargs="+", default=None, help="only instances whose name contains one of these")
     ap.add_argument("--prompts", nargs="+", default=["P1"], choices=["P1", "P2", "P3"])
     ap.add_argument("--contexts", nargs="+", default=["none"], choices=["none", "full", "ablated"])
+    ap.add_argument("--codex-auth", default="chatgpt", choices=["chatgpt", "api"],
+                    help="codex: ChatGPT login (default) or the OPENAI_API_KEY in an isolated CODEX_HOME")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     insts = sorted(d for d in glob.glob(os.path.join(a.instances, "*"))
@@ -102,7 +110,7 @@ def main():
                     fn = os.path.join(a.out, f"{os.path.basename(inst)}__{a.agent}{tag}__s{s}.json")
                     if os.path.exists(fn):
                         continue
-                    json.dump(run(a.agent, inst, s, prompt_id=p, context=c), open(fn, "w"))
+                    json.dump(run(a.agent, inst, s, prompt_id=p, context=c, codex_auth=a.codex_auth), open(fn, "w"))
                     print("done", fn, flush=True)
 
 

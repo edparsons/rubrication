@@ -128,3 +128,9 @@ silent.
 - 2026-10-22 (before any Study 1 run). Amendment v2 registered in `PREREGISTRATION_v2.md` (git tag `prereg-v2`):
   adds Study 1b (moderators of rubrication) and 1b-T (tool-output truncation), and amends Study 1's measurement
   (any-language `used_code`, hand labels for non-Python code, a judged L0-L3 `level`). Studies 2-4 are unchanged.
+- 2026-10-22 (Study 1b, before any scoring). Codex billing: after 74 runs (all 69 Study 1 runs and 5 Study 1b runs)
+  the operator's ChatGPT plan hit its usage limit and 175 Study 1b Codex runs failed ("You've hit your usage limit").
+  Those runs are kept in `runs/errors_first_attempt/s1b_codex_usage_limit/` and re-run once with the OpenAI API key
+  (`--codex-auth api`: a fresh `CODEX_HOME` per run, logged in with the key; the operator's login is untouched).
+  Model (gpt-5.6-terra), CLI version, flags and prompts are unchanged; only billing differs. Run files record
+  `codex_auth`, so billing can be checked as a covariate.
