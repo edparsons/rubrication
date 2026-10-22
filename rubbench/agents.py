@@ -39,7 +39,10 @@ AGENT_CMDS = {
 CONTEXT_DIR = os.path.join(os.path.dirname(__file__), "contexts")
 
 
-def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none", codex_auth="chatgpt"):
+def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none", codex_auth="chatgpt",
+        prompt_text=None, files=None):
+    """prompt_text/files (exploratory elicitation only): a custom prompt, and extra files written into the working
+    directory (name -> content; "CONTEXT" is written as CLAUDE.md for Claude Code and AGENTS.md otherwise)."""
     family = os.path.basename(inst).split("_")[0]
     work = tempfile.mkdtemp(prefix=f"rub1_{agent}_")
     shutil.copy(data_file(inst), work)
@@ -47,9 +50,13 @@ def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none", codex_a
         shutil.copy(os.path.join(CONTEXT_DIR, f"{context}.md"), os.path.join(work, "CLAUDE.md" if agent == "claude" else "AGENTS.md"))
     if os.path.exists(os.path.join(inst, "DATA_DOCS.md")):
         shutil.copy(os.path.join(inst, "DATA_DOCS.md"), work)
-    prompt = prompts.s1_prompt(family, prompt_id)
+    for name, content in (files or {}).items():
+        if name == "CONTEXT":
+            name = "CLAUDE.md" if agent == "claude" else "AGENTS.md"
+        open(os.path.join(work, name), "w").write(content)
+    prompt = prompt_text or prompts.s1_prompt(family, prompt_id)
     cmd = [c.replace("{prompt}", prompt) for c in AGENT_CMDS[agent]]
-    if context != "none":
+    if context != "none" or "CONTEXT" in (files or {}):
         cmd = [c for c in cmd if c != "--no-context-files"]   # pi must load AGENTS.md in context conditions
     env, cfg = None, None
     if agent == "claude":
@@ -78,6 +85,7 @@ def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none", codex_a
     if cfg:
         shutil.rmtree(cfg, ignore_errors=True)
     return dict(instance=os.path.basename(inst), family=family, agent=agent, seed=seed, prompt=prompt_id,
+                prompt_text=prompt,
                 context=context, codex_auth=codex_auth if agent == "codex" else None, returncode=code,
                 stdout=stdout, stderr=stderr[-5000:], files=scripts)
 

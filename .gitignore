@@ -6,3 +6,4 @@ instances/
 runs/**/*.json
 !runs/s1_label_sample.json
 .env
+instances_s1/

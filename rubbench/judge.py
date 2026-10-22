@@ -117,7 +117,7 @@ def main():
             r = json.load(open(fn))
             pre, progs = before_first_output(r), programs(r)
             from . import prompts
-            task = prompts.s1_prompt(r.get("family", "div"), r.get("prompt", "P1"))
+            task = r.get("prompt_text") or prompts.s1_prompt(r.get("family", "div"), r.get("prompt", "P1"))
             text = ("(P) TASK PROMPT\n" + task + "\n\n(A) BEFORE ANY TOOL OUTPUT\n" + (pre or "(nothing)")
                     + "\n\n(B) PROGRAMS\n" + (progs or "(none)"))
             j = judge(text) if (pre.strip() or progs.strip()) else {"level": "L0", "unconditional_claim": False,
