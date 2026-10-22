@@ -324,8 +324,8 @@ def shell_commands(agent, stdout):
 
 # interpreters and computation tools that count as code (prereg-v2); head/wc/cat/sed -n alone do not
 PYTHON_RE = re.compile(r"(?<![\w./-])(?:\S*/)?python3?(?:\.\d+)?(?![\w.-])")
-OTHER_CODE_RE = re.compile(r"(?<![\w./-])(?:\S*/)?(awk|gawk|mawk|perl|ruby|node|Rscript|R|julia|sqlite3|duckdb|psql|bc|dc"
-                           r"|datamash|mlr|csvstat|csvsql|jq)(?![\w.-])")
+OTHER_CODE_RE = re.compile(r"(?:^|[;&|(]|\$\(|`)\s*(?:\S*/)?(awk|gawk|mawk|perl|ruby|node|Rscript|R|julia|sqlite3|duckdb"
+                           r"|psql|bc|dc|datamash|mlr|csvstat|csvsql|jq)(?=\s|$)", re.M)   # in command position only
 
 
 def score_s1(runs, instances, labels=None):

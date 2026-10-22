@@ -155,3 +155,7 @@ Study 1b-T: `python -m rubbench.harness --provider <p> --model <m> --out runs/s1
      whatever the data shows (e.g. "IDENTICAL for both dates"). Reported descriptively by agent and condition; no
      hypothesis.
   Study 1b-T is unchanged (L3 only, detector v2, since harness runs have no pre-output prose to judge).
+- 2026-10-22 (before any Study 1/1b scoring). The list of non-Python interpreters that count as code now matches only
+  in command position (start of a command, or after `;`, `&`, `|`, `(`, `$(` or a backtick). Reason: the Study 5
+  mechanics check showed the letter `R` inside a `sed` pattern being read as the R interpreter. This only affects
+  which runs are sent to hand labelling and `used_code`; the detector and judge are unchanged.

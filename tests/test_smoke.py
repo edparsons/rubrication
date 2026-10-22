@@ -183,6 +183,9 @@ def main():
                             moved_toward_framing=float(rng2.random() < {"posthoc": .5, "prose": .35, "prereg": .1}[a]))
                        for i, (f, a, _) in enumerate(itertools.product(["hope_high", "hope_low"], ["posthoc", "prose", "prereg"], range(20)))])
     assert [r["hypothesis"] for r in analysis.s3v3(d3)] == ["H3b", "H3c"]
+    # non-Python code counts only in command position (not e.g. "R" inside a sed pattern)
+    assert score.OTHER_CODE_RE.search("head x; awk -F, '{print}' f") and score.OTHER_CODE_RE.search("cat f | jq .")
+    assert not score.OTHER_CODE_RE.search("python3 a.py | sed -n '/3b/,/R\\^2 quad/p'")
     print("SMOKE TEST PASSED")
 
 if __name__ == "__main__":
