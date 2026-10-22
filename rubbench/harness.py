@@ -70,15 +70,11 @@ def get_rows(path, offset, limit):
     return json.dumps(df.to_dict(orient="records"))[:TOOL_OUT_MAX]
 
 
-def run_one(provider, inst_dir, condition, seed):
+def build_run_prompt(inst_dir, condition):
+    """The exact prompt a run sees, and whether inline data was truncated (shared with the batch runner)."""
     family = os.path.basename(inst_dir).split("_")[0]
     src = data_file(inst_dir)
-    work = tempfile.mkdtemp(prefix="rub_")
-    shutil.copy(src, work)
     docs = os.path.join(inst_dir, "DATA_DOCS.md")
-    if os.path.exists(docs):
-        shutil.copy(docs, work)
-
     data_text, truncated = None, False
     if condition == "inline":
         raw = open(src).read()
@@ -89,6 +85,18 @@ def run_one(provider, inst_dir, condition, seed):
     prompt = prompts.build_prompt(family, condition, data_text)
     if condition != "inline" and os.path.exists(docs):
         prompt = "A documentation file DATA_DOCS.md is in the working directory.\n" + prompt
+    return prompt, truncated
+
+
+def run_one(provider, inst_dir, condition, seed):
+    family = os.path.basename(inst_dir).split("_")[0]
+    src = data_file(inst_dir)
+    work = tempfile.mkdtemp(prefix="rub_")
+    shutil.copy(src, work)
+    docs = os.path.join(inst_dir, "DATA_DOCS.md")
+    if os.path.exists(docs):
+        shutil.copy(docs, work)
+    prompt, truncated = build_run_prompt(inst_dir, condition)
 
     tools = [TOOLS[t] for t in COND_TOOLS[condition]]
     conv = provider.start(prompt, tools)

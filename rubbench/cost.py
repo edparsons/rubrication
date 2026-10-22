@@ -35,7 +35,7 @@ def run_cost(r):
             if ev.get("type") == "result":
                 return float(ev.get("total_cost_usd") or 0)
         return 0.0
-    return sum(request_cost(r.get("model"), u) for u in r.get("usage", []))
+    return sum(request_cost(r.get("model"), u) for u in r.get("usage", [])) * (0.5 if r.get("batch") else 1)
 
 
 def main(root):

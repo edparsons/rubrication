@@ -104,3 +104,12 @@ silent.
   `used_code = 0`. The pattern now allows interpreter flags before `-c`; the smoke test checks it. Also: agents get an
   empty stdin (`stdin=DEVNULL`) so Claude Code no longer waits 3 s for piped input. Claude Code CLI updated from
   2.1.270 to 2.1.307, the first installed version that accepts `claude-opus-5-5`.
+- 2026-10-22 (after the pilot, before any confirmatory run; decided on pilot cost, not pilot results). Study 2
+  replicates: for claude-opus-5-5 and gpt-5.6-sol only, the `inline` and `rows` conditions run 2 replicates
+  (seeds 0, 1) instead of 5. All other cells (their `code` and `rubric` runs, Studies 3-4, and every GLM 5.3 and
+  DeepSeek 4.1 Flash cell) keep the registered replicates. Reason: inline and rows on large files were ~85% of the
+  API cost in the pilot (projected ~$315 of ~$370); the author capped spend. The GEE models are unchanged and handle
+  the unequal cell sizes; H2a and H2c lose some power for the two API models.
+- 2026-10-22 (same). Study 2 `inline` runs for claude-opus-5-5 and gpt-5.6-sol go through the providers' Batch APIs
+  (`rubbench/batch.py`, 50% price). Inline is a single tool-free request, so prompt, model and output cap are those of
+  the tool-loop harness; only the transport differs. Run files carry `"batch": true` and the batch id.

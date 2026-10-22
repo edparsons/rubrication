@@ -108,6 +108,16 @@ def main():
     # Responses-API provider (OpenAI) runs the same loop and passes reasoning items back
     rlog = harness.run_one(OpenAIResponsesProvider("fake-sol", client=FakeResponses()), os.path.join(inst, "div_borderline_small"), "rubric", 0)
     assert '"MODERATE"' in rlog["final_text"] and len(rlog["scripts"]) == 1, rlog["final_text"]
+    # batch result parsers produce run files the scorer reads like tool-loop runs
+    from rubbench import batch
+    meta = batch._meta(os.path.join(inst, "div_borderline_small"), 0, "m", "p")
+    ans = '```json\n{"corr": 0.112, "corr_verdict": "MODERATE", "tail_verdict": "NO-TAIL-SHAPE", "summary": "x"}\n```'
+    alog = batch.anthropic_log(meta, "q", False, {"content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": ans}],
+                                                    "usage": {"input_tokens": 5, "output_tokens": 7}})
+    olog = batch.openai_log(meta, "q", False, {"output": [{"type": "reasoning"}, {"type": "message", "content": [{"type": "output_text", "text": ans}]}],
+                                                "usage": {"input_tokens": 5, "output_tokens": 7}})
+    for blog in (alog, olog):
+        assert score.final_json(blog["final_text"])["corr_verdict"] == "MODERATE" and blog["batch"], blog
     # inline condition builds a prompt and flags truncation correctly
     log = harness.run_one(AnthropicProvider("fake", client=FakeClient()), os.path.join(inst, "div_moderate_small"), "inline", 0)
     assert log["inline_truncated"] is False
