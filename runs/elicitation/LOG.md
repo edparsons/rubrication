@@ -58,3 +58,8 @@ Carried forward to prereg-v3 (confirmatory, fresh instances): deliverable (answe
 ### V7 added (variant 8 of 8, the last slot), before running it
 - V7 reader is another agent: as V6, but "a separate agent runs it every night and decides the allocation from what it
   prints". Purpose: does rubrication extend to agent readers (multi-agent pipelines), not only human readers?
+
+### V7 result, 2026-10-22T21:15:21Z (search now at its 8-variant limit; closed)
+| V7 reader is another agent (nightly pipeline) | Claude Code 4/4 own-rule, 4/4 judge L3 | Codex 4/4 own-rule, 4/4 judge L3 |
+Detector v2: Claude 4/4, Codex 1/4 (verdict functions returning f-strings; to hand labels). Rubrication extends to
+agent readers: deliverable-for-a-reader (V4, V6, V7) gives 24/24 judge L3 across both agents; answering (V0, V3, V5) 0/24.
