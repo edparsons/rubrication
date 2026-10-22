@@ -47,12 +47,18 @@ class _AnthropicConv:
         self.messages = [{"role": "user", "content": prompt}]
 
     def step(self):
-        kw = dict(model=self.p.model, max_tokens=self.p.max_tokens, messages=self.messages)
+        # auto prompt caching: cost only, outputs unchanged. "input" stays total prompt tokens (cached + uncached),
+        # matching OpenAI's prompt_tokens, so the input_tokens outcome means the same thing for every provider.
+        kw = dict(model=self.p.model, max_tokens=self.p.max_tokens, messages=self.messages,
+                  cache_control={"type": "ephemeral"})
         if self.tools:
             kw["tools"] = self.tools
         r = self.p.client.messages.create(**kw)
         self.messages.append({"role": "assistant", "content": [b.model_dump() for b in r.content]})
-        t = Turn(usage={"input": r.usage.input_tokens, "output": r.usage.output_tokens}, done=r.stop_reason != "tool_use")
+        u = r.usage
+        cr, cw = getattr(u, "cache_read_input_tokens", 0) or 0, getattr(u, "cache_creation_input_tokens", 0) or 0
+        t = Turn(usage={"input": u.input_tokens + cr + cw, "output": u.output_tokens, "cache_read": cr, "cache_write": cw},
+                 done=r.stop_reason != "tool_use")
         for b in r.content:
             if b.type == "text":
                 t.texts.append(b.text)

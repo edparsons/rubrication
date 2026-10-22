@@ -79,3 +79,8 @@ silent.
 - 2026-10-21 (before any run). Claude Code in Study 1 runs with `--bare` and `--model claude-opus-5-5`. Reason: without
   `--bare` the headless agent loads the operator's personal plugins, hooks and memory, which would leak into the
   agent's behaviour; the model is pinned so the run is reproducible.
+- 2026-10-21 (before any run). Harness: automatic prompt caching (`cache_control: ephemeral`) on Anthropic tool-loop
+  requests. Reason: cost; the full conversation is resent each turn, so `rows` runs on large files are expensive.
+  Caching does not change what the model sees or outputs. The usage log keeps `input` = total prompt tokens
+  (uncached + cache read + cache write), so the `input_tokens` outcome has the same meaning for every provider
+  (OpenAI's `prompt_tokens` already includes cached tokens).
