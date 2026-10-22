@@ -21,7 +21,7 @@ from .harness import data_file
 AGENT_CMDS = {
     # Claude Code headless mode; stream-json keeps every tool call (Bash/Write inputs) in the log.
     "claude": ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
-               "--dangerously-skip-permissions", "--bare", "--model", "claude-opus-5-5"],
+               "--dangerously-skip-permissions", "--model", "claude-opus-5-5"],
     # OpenAI Codex CLI non-interactive mode (verify flags for your installed version).
     "codex": ["codex", "exec", "--full-auto", "{prompt}"],
     # pi (pi.dev) on LunaRoute open-weights models; built-in tools only, no user skills/context/session files.
@@ -39,8 +39,13 @@ def run(agent, inst, seed, timeout=1800):
         shutil.copy(os.path.join(inst, "DATA_DOCS.md"), work)
     prompt = prompts.S1_PROMPT.format(question=prompts.QUESTION[family], spec=prompts.ANSWER_SPEC[family])
     cmd = [c.replace("{prompt}", prompt) for c in AGENT_CMDS[agent]]
+    env, cfg = None, None
+    if agent == "claude":
+        # fresh, empty config dir per run: default tools, none of the operator's plugins, hooks, memory or settings
+        cfg = tempfile.mkdtemp(prefix="rub1_cfg_")
+        env = {**os.environ, "CLAUDE_CONFIG_DIR": cfg}
     try:
-        r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout, env=env)
         stdout, stderr, code = r.stdout, r.stderr, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, stderr, code = (e.stdout or ""), "[timeout]", -1
@@ -48,6 +53,8 @@ def run(agent, inst, seed, timeout=1800):
     for p in glob.glob(os.path.join(work, "**", "*.py"), recursive=True):
         scripts[os.path.relpath(p, work)] = open(p, errors="replace").read()
     shutil.rmtree(work, ignore_errors=True)
+    if cfg:
+        shutil.rmtree(cfg, ignore_errors=True)
     return dict(instance=os.path.basename(inst), family=family, agent=agent, seed=seed, returncode=code,
                 stdout=stdout, stderr=stderr[-5000:], files=scripts)
 

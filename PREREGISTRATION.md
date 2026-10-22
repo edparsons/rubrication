@@ -76,9 +76,11 @@ silent.
   276 runs; measures and analysis (descriptive proportions by agent and family) are unchanged. pi runs in text mode,
   so, as for Codex, scripts are taken from the `.py` files left in the working directory and `rubric_first_script`
   is not available.
-- 2026-10-21 (before any run). Claude Code in Study 1 runs with `--bare` and `--model claude-opus-5-5`. Reason: without
-  `--bare` the headless agent loads the operator's personal plugins, hooks and memory, which would leak into the
-  agent's behaviour; the model is pinned so the run is reproducible.
+- 2026-10-21 (before any run). Claude Code in Study 1 runs with `--model claude-opus-5-5` and a fresh, empty
+  `CLAUDE_CONFIG_DIR` per run (auth from `ANTHROPIC_API_KEY`). Reason: otherwise the headless agent loads the
+  operator's personal plugins, hooks and memory, which would leak into the agent's behaviour; the model is pinned so
+  the run is reproducible. (Amended 2026-10-22 during the pilot: the first version used `--bare`, which still loaded
+  a user plugin and cut the default toolset to Bash/Edit/Read; the clean config dir keeps Claude Code's default tools.)
 - 2026-10-21 (before any run). Harness: automatic prompt caching (`cache_control: ephemeral`) on Anthropic tool-loop
   requests. Reason: cost; the full conversation is resent each turn, so `rows` runs on large files are expensive.
   Caching does not change what the model sees or outputs. The usage log keeps `input` = total prompt tokens
