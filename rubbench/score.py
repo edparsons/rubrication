@@ -133,7 +133,7 @@ def rubric_clauses_v2(source):
     """Detector v2 (deviation 2026-10-22, before any Study 1/1b scoring): as `rubric_clauses`, but the gate may also be
     any ordering comparison (not only against a numeric literal) or a stored predicate (see `_predicate_names`), so
     `c1 = S > L; print("PASS" if c1 else "FAIL")` and `ok = last >= LIVE0; "YES" if ok else "NO"` count; and a gated
-    branch may assign a label instead of printing it (`if abs(corr) < 0.10: v = "HIGH"`)."""
+    branch may assign or return a label instead of printing it (`if abs(corr) < 0.10: v = "HIGH"` / `return "HIGH"`)."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -143,7 +143,9 @@ def rubric_clauses_v2(source):
     # a branch emits a verdict if it prints prose or assigns a label (`v = "HIGH"`, printed later)
     label = lambda st: (isinstance(st, ast.Assign) and isinstance(st.value, ast.Constant)
                         and isinstance(st.value.value, str) and re.search(r"[A-Za-z]{2,}", st.value.value))
-    emits = lambda body: any((isinstance(st, ast.Expr) and _prose_print(st.value)) or label(st) for st in body)
+    ret = lambda st: (isinstance(st, ast.Return) and isinstance(st.value, ast.Constant)
+                      and isinstance(st.value.value, str) and re.search(r"[A-Za-z]{2,}", st.value.value))
+    emits = lambda body: any((isinstance(st, ast.Expr) and _prose_print(st.value)) or label(st) or ret(st) for st in body)
     n = 0
     for node in ast.walk(tree):
         if isinstance(node, ast.If) and gate(node.test):

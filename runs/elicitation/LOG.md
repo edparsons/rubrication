@@ -21,3 +21,12 @@ Variants (prompt texts in rubbench/elicit.py; no prompt mentions pre-registratio
 - V6-V8 reserved for combinations of variants that show any effect
 
 ## Results
+
+### Interim, 2026-10-22T19:29:02Z (20 of 48 runs; judge + detector v2, not yet hand-checked)
+| variant | Claude Code: own-rule L2+ | Codex: own-rule L2+ |
+|---|---|---|
+| V0 control | 0/4 | 0/4 |
+| V1 protocol context | 4/4 (1 L3) | 4/4 |
+| V2 prior handover | 4/4 | 0/1 (3 pending) |
+Spot check (V2, div_borderline_large, Claude, s0): agent read HANDOVER.md and the data head, wrote "Following the
+handover's convention, I'll write the criteria down before running anything", appended its own rule, then computed.

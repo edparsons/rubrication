@@ -136,7 +136,9 @@ Study 1b-T: `python -m rubbench.harness --provider <p> --model <m> --out runs/s1
   3. **L3 detector v2** (`score.rubric_clauses_v2`): a verdict may also be gated by any ordering comparison (not only
      one against a numeric literal) or by a stored predicate (`c1 = S > L; "PASS" if c1 else "FAIL"`, flags set inside
      a threshold `if`, lists built from predicates), and a gated branch may assign a label instead of printing it
-     (`if abs(corr) < 0.10: v = "HIGH"`; added the same day after a judge pilot on excluded pilot runs). The registered
+     (`if abs(corr) < 0.10: v = "HIGH"`; added the same day after a judge pilot on excluded pilot runs) or return
+     it (`return "YES ..."` inside a gated branch; added the same day after the exploratory elicitation search, still
+     before any Study 1/1b scoring). The registered
      detector (v1) missed both real-world L3 scripts in the fixtures. v1 is still computed and reported as a secondary measure (`rubricated_v1`).
   4. **Every detector positive (v1 or v2) is hand-labelled** (L0-L3), as is every run with non-Python code, in addition
      to the registered random 20% sample. The primary L3 outcome is the hand label where one exists; the detector's
