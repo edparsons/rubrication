@@ -125,3 +125,6 @@ silent.
   same footing as Claude Code). Codex runs on the operator's ChatGPT login, which does not accept gpt-5.6-sol, so the
   model is gpt-5.6-terra; `OPENAI_API_KEY` is removed from its environment so it never bills the API. The scorer reads
   Codex's ordered shell commands from the JSON stream (unwrapping `zsh -lc "..."`), as for Claude Code and pi.
+- 2026-10-22 (before any Study 1 run). Amendment v2 registered in `PREREGISTRATION_v2.md` (git tag `prereg-v2`):
+  adds Study 1b (moderators of rubrication) and 1b-T (tool-output truncation), and amends Study 1's measurement
+  (any-language `used_code`, hand labels for non-Python code, a judged L0-L3 `level`). Studies 2-4 are unchanged.

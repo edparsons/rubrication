@@ -144,6 +144,21 @@ def main():
     # leak ground truth separates correct vs leaky backtests
     gt = json.load(open(os.path.join(inst, "leak_0_timing", "ground_truth.json")))
     assert gt["sharpe_leaky"] - abs(gt["sharpe_correct"]) > 30, gt
+    # Study 1b: context file lands in the working directory under the agent's name; prompts differ by factor
+    from rubbench import agents, analysis, prompts
+    agents.AGENT_CMDS["fake"] = ["sh", "-c", "ls; head -1 AGENTS.md", "{prompt}"]
+    fr = agents.run("fake", os.path.join(inst, "div_borderline_small"), 0, prompt_id="P2", context="ablated")
+    assert "AGENTS.md" in fr["stdout"] and "Quant Research" in fr["stdout"] and fr["prompt"] == "P2", fr["stdout"]
+    assert "thresholds" not in prompts.s1_prompt("div", "P2") and "0.10" not in prompts.s1_prompt("div", "P2")
+    assert "STRONG" not in open(os.path.join(agents.CONTEXT_DIR, "ablated.md")).read()
+    # Study 1b analysis runs on a balanced synthetic design and names every planned contrast
+    import itertools, pandas as pd
+    rng2 = np.random.default_rng(3)
+    d1b = pd.DataFrame([dict(instance=f"i{i}_{z}", size=z, prompt=p, context=c, agent=g,
+                             rubricated=float(rng2.random() < 0.3 + 0.2 * (c == "full") + 0.1 * (z == "large")))
+                        for i, z, p, c, g, _ in itertools.product(range(5), ["small", "large"], ["P1", "P2", "P3"],
+                                                                 ["none", "full", "ablated"], ["a", "b"], range(2))])
+    assert [r["hypothesis"] for r in analysis.s1b(d1b)] == ["H1b-1", "H1b-2", "H1b-3", "H1b-4"]
     print("SMOKE TEST PASSED")
 
 if __name__ == "__main__":

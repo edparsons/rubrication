@@ -76,3 +76,23 @@ def build_prompt(family, condition, data_text=None):
     if condition == "inline":
         p += "\n\n<file>\n" + (data_text or "") + "\n</file>"
     return p
+
+
+# Study 1b: prompt factor. P1 is the registered Study 1 prompt; P2 asks for a verdict with no thresholds or labels;
+# P3 asks an open, descriptive question. P2/P3 ask for a written answer (no JSON).
+FILE_LINE = {
+    "div": "File: returns.csv with columns `strategy` and `spy` (daily-style simple returns, one row per period).",
+    "cal": "File: contracts.csv with columns `contract_id`, `price` (market price of YES in [0,1]) and `resolved_yes` (0/1).",
+}
+S1B_QUESTION = {
+    ("div", "P2"): "Question: is this strategy diversifying me against SPY? Give a clear verdict.",
+    ("div", "P3"): "Question: describe how this strategy's returns relate to SPY's.",
+    ("cal", "P2"): "Question: are these prices well calibrated? Give a clear verdict.",
+    ("cal", "P3"): "Question: describe how these prices relate to the outcomes.",
+}
+
+
+def s1_prompt(family, prompt="P1"):
+    if prompt == "P1":
+        return S1_PROMPT.format(question=QUESTION[family], spec=ANSWER_SPEC[family])
+    return FILE_LINE[family] + "\n" + S1B_QUESTION[(family, prompt)] + "\n\nThe data file is in the current directory."

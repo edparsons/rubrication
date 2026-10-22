@@ -4,6 +4,9 @@ Logistic GEE (binomial, exchangeable working correlation) clustered by instance,
 Planned contrasts are reported as odds ratios with Wald 95% CIs and Holm-adjusted p-values.
 
   python -m rubbench.analysis --s2 runs/s2_all.csv --s3 runs/s3_all.csv --s4 runs/s4_all.csv --out results
+  python -m rubbench.analysis --s1b runs/s1b/s1_scored.csv --s1bt runs/s1bt_all.csv --out results   (prereg-v2)
+
+Studies 1b and 1b-T (prereg-v2) form their own Holm family, written to results/confirmatory_v2.csv.
 
 Each input is the row-wise concatenation of the per-model *_scored.csv files (add a `model` column if missing).
 """
@@ -80,12 +83,60 @@ def s4(df):
     return [dict(hypothesis="H4", **contrast(r, "C(docs, Treatment('basic'))[T.timing]"), vs="basic")]
 
 
+def s1b(df):
+    """H1b-1..H1b-4: rubricated ~ prompt + size + context + agent, clustered by instance (P1 runs included)."""
+    d = df.copy()
+    f = ("rubricated ~ C(prompt, Treatment('P3')) + C(size, Treatment('small')) + C(context, Treatment('none'))"
+         " + C(agent)")
+    r = gee(d, f, "instance")
+    out = [dict(hypothesis="H1b-1", **contrast(r, "C(size, Treatment('small'))[T.large]"), vs="small"),
+           dict(hypothesis="H1b-2", **contrast(r, "C(prompt, Treatment('P3'))[T.P2]"), vs="P3"),
+           dict(hypothesis="H1b-3", **contrast(r, "C(context, Treatment('none'))[T.full]"), vs="none")]
+    r = gee(d, f.replace("Treatment('none')", "Treatment('ablated')"), "instance")
+    out.append(dict(hypothesis="H1b-4", **contrast(r, "C(context, Treatment('ablated'))[T.full]"), vs="ablated"))
+    return out
+
+
+def s1bt(df):
+    """H1b-5: in the harness `code` condition, rubrication at a 2,000- vs 20,000-character tool output cap."""
+    d = df.copy()
+    d["rubricated"] = (d.rubric_clauses > 0).astype(float)
+    d["cap"] = d.tool_out_max.map({2000: "short", 20000: "long"})
+    r = gee(d, "rubricated ~ C(cap, Treatment('long')) + C(model) + C(size)", "instance")
+    return [dict(hypothesis="H1b-5", **contrast(r, "C(cap, Treatment('long'))[T.short]"), vs="long")]
+
+
+def safe(fn, df, hyps):
+    """A contrast with no variation in the outcome is reported as not estimable, with counts (prereg-v2)."""
+    try:
+        return fn(df)
+    except Exception as e:   # perfect separation / constant outcome
+        n = int(df["rubricated"].sum()) if "rubricated" in df else None
+        return [dict(hypothesis=h, term="not estimable", note=f"{type(e).__name__}: {e}"[:200], rubricated_runs=n,
+                     runs=len(df)) for h in hyps]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--s2"); ap.add_argument("--s3"); ap.add_argument("--s4")
+    ap.add_argument("--s1b"); ap.add_argument("--s1bt")
     ap.add_argument("--out", default="results")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
+    if a.s1b or a.s1bt:
+        rows = []
+        if a.s1b: rows += safe(s1b, pd.read_csv(a.s1b), ["H1b-1", "H1b-2", "H1b-3", "H1b-4"])
+        if a.s1bt:
+            d = pd.read_csv(a.s1bt); d["rubricated"] = (d.rubric_clauses > 0).astype(float)
+            rows += safe(s1bt, d, ["H1b-5"])
+        res = pd.DataFrame(rows)
+        if "p" in res and res.p.notna().any():
+            ok = res.p.notna()
+            res.loc[ok, "p_holm"] = holm(res.loc[ok, "p"].to_numpy())
+        res.to_csv(os.path.join(a.out, "confirmatory_v2.csv"), index=False)
+        print(res.to_string())
+        if not (a.s2 or a.s3 or a.s4):
+            return
     rows = []
     if a.s2: rows += s2(pd.read_csv(a.s2))
     if a.s3: rows += s3(pd.read_csv(a.s3))

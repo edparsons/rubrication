@@ -6,6 +6,8 @@ Commands are configurable because CLI flags change between releases; check them 
 
 Usage
   python -m rubbench.agents --instances instances --out runs/s1 --agent claude --seeds 0 1 2
+  Study 1b adds --prompts P1 P2 P3 and --contexts none full ablated (context files in rubbench/contexts/; written to
+  the working directory as CLAUDE.md for Claude Code and AGENTS.md for Codex and pi).
 """
 import argparse
 import glob
@@ -34,14 +36,21 @@ AGENT_CMDS = {
 }
 
 
-def run(agent, inst, seed, timeout=1800):
+CONTEXT_DIR = os.path.join(os.path.dirname(__file__), "contexts")
+
+
+def run(agent, inst, seed, timeout=1800, prompt_id="P1", context="none"):
     family = os.path.basename(inst).split("_")[0]
     work = tempfile.mkdtemp(prefix=f"rub1_{agent}_")
     shutil.copy(data_file(inst), work)
+    if context != "none":
+        shutil.copy(os.path.join(CONTEXT_DIR, f"{context}.md"), os.path.join(work, "CLAUDE.md" if agent == "claude" else "AGENTS.md"))
     if os.path.exists(os.path.join(inst, "DATA_DOCS.md")):
         shutil.copy(os.path.join(inst, "DATA_DOCS.md"), work)
-    prompt = prompts.S1_PROMPT.format(question=prompts.QUESTION[family], spec=prompts.ANSWER_SPEC[family])
+    prompt = prompts.s1_prompt(family, prompt_id)
     cmd = [c.replace("{prompt}", prompt) for c in AGENT_CMDS[agent]]
+    if context != "none":
+        cmd = [c for c in cmd if c != "--no-context-files"]   # pi must load AGENTS.md in context conditions
     env, cfg = None, None
     if agent == "claude":
         # fresh, empty config dir per run: default tools, none of the operator's plugins, hooks, memory or settings
@@ -62,7 +71,8 @@ def run(agent, inst, seed, timeout=1800):
     shutil.rmtree(work, ignore_errors=True)
     if cfg:
         shutil.rmtree(cfg, ignore_errors=True)
-    return dict(instance=os.path.basename(inst), family=family, agent=agent, seed=seed, returncode=code,
+    return dict(instance=os.path.basename(inst), family=family, agent=agent, seed=seed, prompt=prompt_id,
+                context=context, returncode=code,
                 stdout=stdout, stderr=stderr[-5000:], files=scripts)
 
 
@@ -73,18 +83,27 @@ def main():
     ap.add_argument("--agent", choices=list(AGENT_CMDS), required=True)
     ap.add_argument("--families", nargs="+", default=["div", "cal", "leak"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
+    ap.add_argument("--match", nargs="+", default=None, help="only instances whose name contains one of these")
+    ap.add_argument("--prompts", nargs="+", default=["P1"], choices=["P1", "P2", "P3"])
+    ap.add_argument("--contexts", nargs="+", default=["none"], choices=["none", "full", "ablated"])
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     insts = sorted(d for d in glob.glob(os.path.join(a.instances, "*"))
                    if os.path.isdir(d) and os.path.basename(d).split("_")[0] in a.families
                    and not os.path.basename(d).endswith(("_basic", "_timing")))  # S1 uses undocumented leak tasks only
+    if a.match:
+        insts = [d for d in insts if any(m in os.path.basename(d) for m in a.match)]
+    s1b = a.prompts != ["P1"] or a.contexts != ["none"]   # Study 1 file names stay as registered
     for inst in insts:
-        for s in a.seeds:
-            fn = os.path.join(a.out, f"{os.path.basename(inst)}__{a.agent}__s{s}.json")
-            if os.path.exists(fn):
-                continue
-            json.dump(run(a.agent, inst, s), open(fn, "w"))
-            print("done", fn, flush=True)
+        for p in a.prompts:
+            for c in a.contexts:
+                for s in a.seeds:
+                    tag = f"__{p}__{c}" if s1b else ""
+                    fn = os.path.join(a.out, f"{os.path.basename(inst)}__{a.agent}{tag}__s{s}.json")
+                    if os.path.exists(fn):
+                        continue
+                    json.dump(run(a.agent, inst, s, prompt_id=p, context=c), open(fn, "w"))
+                    print("done", fn, flush=True)
 
 
 if __name__ == "__main__":

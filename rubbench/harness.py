@@ -102,7 +102,7 @@ def run_one(provider, inst_dir, condition, seed):
     conv = provider.start(prompt, tools)
     log = dict(instance=os.path.basename(inst_dir), family=family, condition=condition, seed=seed,
                model=provider.model, provider=type(provider).__name__,
-               inline_truncated=truncated, scripts=[], tool_outputs=[], usage=[], turns=0)
+               inline_truncated=truncated, tool_out_max=TOOL_OUT_MAX, scripts=[], tool_outputs=[], usage=[], turns=0)
     final_text = ""
     for turn in range(MAX_TURNS):
         t = conv.step()
@@ -139,7 +139,9 @@ def main():
     ap.add_argument("--families", nargs="+", default=["div", "cal"])
     ap.add_argument("--match", default="", help="only instances whose name contains this string")
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
+    ap.add_argument("--tool-out-max", type=int, default=TOOL_OUT_MAX, help="tool output cap in characters (Study 1b-T)")
     a = ap.parse_args()
+    globals()["TOOL_OUT_MAX"] = a.tool_out_max
     from .providers import make_provider
     provider = make_provider(a.provider, a.model)
     os.makedirs(a.out, exist_ok=True)
