@@ -119,3 +119,29 @@ Study 1b-T: `python -m rubbench.harness --provider <p> --model <m> --out runs/s1
 --match <same 10 names> --conditions code --tool-out-max 2000|20000 --seeds 0 1 2`. Scoring: `rubbench.score s1`
 (with `--labels` for hand labels of non-Python code), `rubbench.score s2` for 1b-T, then `rubbench.judge` for
 `level`.
+
+## Deviations
+
+- 2026-10-22 (before any Study 1 or 1b run was scored; no outcome had been computed or seen). Combined measurement
+  amendment, motivated by four agent-written scripts from the author's own project (paraphrased as fixtures in
+  `tests/fixtures/gappers_*.py`) and by the excluded 1b mechanics pilot, not by Study 1/1b data:
+  1. **L2+ becomes a co-primary outcome** with L3, for Study 1 (descriptive) and Study 1b (H1b-1 to H1b-4 are tested
+     for both outcomes; the Holm family grows from 5 to 9 contrasts). Reason: the author's claim is that coding agents
+     pre-register their own interpretation (L2) unprompted; in the author's project agents did so consistently, while
+     rubrication proper (L3) appeared only sometimes.
+  2. **L2 is judged on what the agent wrote before its first tool output** as well as its code: interpretation rules or
+     thresholds stated in the agent's own messages before it saw any result now count, as do rules in code, comments
+     and docstrings. The judge (`rubbench/judge.py`, prompt frozen with this entry) receives (A) the agent's text and
+     tool calls before the first tool output and (B) all programs, never the final answer.
+  3. **L3 detector v2** (`score.rubric_clauses_v2`): a verdict may also be gated by any ordering comparison (not only
+     one against a numeric literal) or by a stored predicate (`c1 = S > L; "PASS" if c1 else "FAIL"`, flags set inside
+     a threshold `if`, lists built from predicates). The registered detector (v1) missed both real-world L3 scripts in
+     the fixtures. v1 is still computed and reported as a secondary measure (`rubricated_v1`).
+  4. **Every detector positive (v1 or v2) is hand-labelled** (L0-L3), as is every run with non-Python code, in addition
+     to the registered random 20% sample. The primary L3 outcome is the hand label where one exists; the detector's
+     call is provisional until then. Both detectors' precision is reported against the labels; recall is estimated
+     from the random 20% sample. Labels are made blind to agent, prompt and context.
+  5. **New flag `unconditional_claim`** (judged): a fixed sentence in code that asserts a result about the data
+     whatever the data shows (e.g. "IDENTICAL for both dates"). Reported descriptively by agent and condition; no
+     hypothesis.
+  Study 1b-T is unchanged (L3 only, detector v2, since harness runs have no pre-output prose to judge).

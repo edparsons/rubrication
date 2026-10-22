@@ -159,6 +159,14 @@ def main():
                         for i, z, p, c, g, _ in itertools.product(range(5), ["small", "large"], ["P1", "P2", "P3"],
                                                                  ["none", "full", "ablated"], ["a", "b"], range(2))])
     assert [r["hypothesis"] for r in analysis.s1b(d1b)] == ["H1b-1", "H1b-2", "H1b-3", "H1b-4"]
+    # detector v2 on paraphrased real-world fixtures: stored-predicate verdicts count, operationalisations do not
+    fx = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+    v2 = {f: score.rubric_clauses_v2(open(os.path.join(fx, f)).read()) for f in os.listdir(fx) if f.endswith(".py")}
+    assert v2["gappers_pass241_like.py"] > 0 and v2["gappers_coverage_flag_like.py"] > 0, v2
+    assert v2["gappers_depth_table_like.py"] == 0 and v2["gappers_lucky_cells_like.py"] == 0, v2
+    assert score.rubric_clauses_v2(RUBRIC_SCRIPT) == 3 and score.rubric_clauses_v2(PLAIN_SCRIPT) == 0
+    d1b["l2plus"] = d1b.rubricated
+    assert [r["hypothesis"] for r in analysis.s1b(d1b, "l2plus", "-L2+")][0] == "H1b-1-L2+"
     print("SMOKE TEST PASSED")
 
 if __name__ == "__main__":

@@ -101,6 +101,59 @@ def rubric_clauses(source):
     return n
 
 
+ORDER_OPS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE)
+BOOLISH = (ast.Compare, ast.BoolOp, ast.UnaryOp, ast.ListComp, ast.GeneratorExp, ast.Name)
+
+
+def _has_ordering(node):
+    return any(isinstance(n, ast.Compare) and any(isinstance(o, ORDER_OPS) for o in n.ops) for n in ast.walk(node))
+
+
+def _refs(node, names):
+    return any(isinstance(n, ast.Name) and n.id in names for n in ast.walk(node))
+
+
+def _predicate_names(tree):
+    """Names holding a threshold predicate: `ok = last >= LIVE0`, `c1 = a > b and c > d`, `fails = [n for n, c in ... if not c]`,
+    and flags set inside a threshold `if` (`if ds <= 0: c2 = False`)."""
+    preds = set()
+    for _ in range(3):   # fixpoint over chains of predicates
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, BOOLISH):
+                if _has_ordering(node.value) or _refs(node.value, preds):
+                    preds |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+            if isinstance(node, ast.If) and (_has_ordering(node.test) or _refs(node.test, preds)):
+                for st in node.body + node.orelse:
+                    if isinstance(st, ast.Assign) and isinstance(st.value, ast.Constant) and isinstance(st.value.value, bool):
+                        preds |= {t.id for t in st.targets if isinstance(t, ast.Name)}
+    return preds
+
+
+def rubric_clauses_v2(source):
+    """Detector v2 (deviation 2026-10-22, before any Study 1/1b scoring): as `rubric_clauses`, but the gate may also be
+    any ordering comparison (not only against a numeric literal) or a stored predicate (see `_predicate_names`), so
+    `c1 = S > L; print("PASS" if c1 else "FAIL")` and `ok = last >= LIVE0; "YES" if ok else "NO"` count."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return 0
+    preds = _predicate_names(tree)
+    gate = lambda t: _is_threshold_compare(t) or _has_ordering(t) or _refs(t, preds)
+    n = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If) and gate(node.test):
+            if any(_prose_print(s.value) for s in node.body if isinstance(s, ast.Expr)):
+                n += 1
+            if node.orelse and not (len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If)):
+                if any(_prose_print(s.value) for s in node.orelse if isinstance(s, ast.Expr)):
+                    n += 1
+        if isinstance(node, ast.IfExp) and gate(node.test):
+            if any(isinstance(x, ast.Constant) and isinstance(x.value, str) and re.search(r"[A-Za-z]{2,}", x.value)
+                   for x in (node.body, node.orelse)):
+                n += 1
+    return n
+
+
 def _script_from_shell(cmd):
     """Python source run inline by a shell command (python -c '...' or a heredoc), else None."""
     m = re.search(r"python3?(?:\s+-[A-Za-z]+)*\s+-c\s+(['\"])(.*)\1", cmd, re.S)  # allows flags, e.g. python3 -I -c
@@ -282,30 +335,34 @@ def score_s1(runs, instances, labels=None):
                   (scripts_from_codex_stream, final_text_from_codex_stream) if agent == "codex" else None)
         ordered = stream[0](out) if stream else []
         sources = ordered or list((r.get("files") or {}).values())
-        counts = [rubric_clauses(s) for s in sources]
+        counts1 = [rubric_clauses(s) for s in sources]      # registered detector (v1), kept as secondary
+        counts = [rubric_clauses_v2(s) for s in sources]    # detector v2 (stored predicates), primary
         final = stream[1](out) if stream else out
         prompt = r.get("prompt", "P1")
         answered = final_json(final) is not None if prompt == "P1" else bool((final or "").strip())
         other = [c for c in shell_commands(agent, out) if OTHER_CODE_RE.search(c)]
         ran_python = any(PYTHON_RE.search(c) for c in shell_commands(agent, out))
-        label = hand.get(os.path.basename(fn))
+        label = hand.get(os.path.basename(fn))   # hand label L0-L3, required for every detector positive
         rows.append(dict(file=os.path.basename(fn), instance=r["instance"], family=r.get("family"), agent=agent,
                          seed=r.get("seed"), prompt=prompt, context=r.get("context", "none"),
                          size="large" if r["instance"].endswith("_large") else "small",
                          n_scripts=len(sources), n_other_programs=len(other),
                          used_code=float(bool(sources) or bool(other) or ran_python),
-                         rubricated_python=float(sum(counts) > 0),
-                         rubricated=float(sum(counts) > 0 or label == "L3"),
-                         needs_hand_label=float(bool(other) and sum(counts) == 0 and label is None),
+                         rubricated_v1=float(sum(counts1) > 0), rubricated_v2=float(sum(counts) > 0),
+                         hand_label=label,
+                         # primary L3: the hand label where there is one, else the v2 detector (provisional)
+                         rubricated=float(label == "L3") if label else float(sum(counts) > 0),
+                         needs_hand_label=float(label is None and (sum(counts) > 0 or sum(counts1) > 0 or bool(other))),
                          rubric_first_script=float(bool(ordered) and counts[0] > 0) if ordered else np.nan,
-                         rubric_clauses=sum(counts), answered=float(answered),
+                         rubric_clauses=sum(counts), rubric_clauses_v1=sum(counts1), answered=float(answered),
                          other_programs=json.dumps(other)))
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(runs, "s1_scored.csv"), index=False)
     by = ["agent", "family"] + (["prompt", "context"] if df[["prompt", "context"]].nunique().max() > 1 else [])
     print(summarise(df, by, ["used_code", "rubricated", "rubric_first_script", "answered"]).to_string())
     if df.needs_hand_label.sum():
-        print(f"{int(df.needs_hand_label.sum())} runs ran non-Python code with no Python L3 and need a hand label")
+        print(f"{int(df.needs_hand_label.sum())} runs need a hand label (every detector positive, and all non-Python code); "
+              "until labelled, `rubricated` is the v2 detector's provisional call")
     return df
 
 

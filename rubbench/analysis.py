@@ -83,17 +83,18 @@ def s4(df):
     return [dict(hypothesis="H4", **contrast(r, "C(docs, Treatment('basic'))[T.timing]"), vs="basic")]
 
 
-def s1b(df):
-    """H1b-1..H1b-4: rubricated ~ prompt + size + context + agent, clustered by instance (P1 runs included)."""
+def s1b(df, outcome="rubricated", tag=""):
+    """H1b-1..H1b-4: <outcome> ~ prompt + size + context + agent, clustered by instance (P1 runs included).
+    outcome: `rubricated` (L3) or `l2plus` (L2 or L3; co-primary since the 2026-10-22 deviation)."""
     d = df.copy()
-    f = ("rubricated ~ C(prompt, Treatment('P3')) + C(size, Treatment('small')) + C(context, Treatment('none'))"
+    f = (f"{outcome} ~ C(prompt, Treatment('P3')) + C(size, Treatment('small')) + C(context, Treatment('none'))"
          " + C(agent)")
     r = gee(d, f, "instance")
-    out = [dict(hypothesis="H1b-1", **contrast(r, "C(size, Treatment('small'))[T.large]"), vs="small"),
-           dict(hypothesis="H1b-2", **contrast(r, "C(prompt, Treatment('P3'))[T.P2]"), vs="P3"),
-           dict(hypothesis="H1b-3", **contrast(r, "C(context, Treatment('none'))[T.full]"), vs="none")]
+    out = [dict(hypothesis="H1b-1" + tag, **contrast(r, "C(size, Treatment('small'))[T.large]"), vs="small"),
+           dict(hypothesis="H1b-2" + tag, **contrast(r, "C(prompt, Treatment('P3'))[T.P2]"), vs="P3"),
+           dict(hypothesis="H1b-3" + tag, **contrast(r, "C(context, Treatment('none'))[T.full]"), vs="none")]
     r = gee(d, f.replace("Treatment('none')", "Treatment('ablated')"), "instance")
-    out.append(dict(hypothesis="H1b-4", **contrast(r, "C(context, Treatment('ablated'))[T.full]"), vs="ablated"))
+    out.append(dict(hypothesis="H1b-4" + tag, **contrast(r, "C(context, Treatment('ablated'))[T.full]"), vs="ablated"))
     return out
 
 
@@ -120,12 +121,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--s2"); ap.add_argument("--s3"); ap.add_argument("--s4")
     ap.add_argument("--s1b"); ap.add_argument("--s1bt")
+    ap.add_argument("--s1b-levels", help="judge output (s1_levels.csv) for the co-primary L2+ outcome")
     ap.add_argument("--out", default="results")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     if a.s1b or a.s1bt:
         rows = []
-        if a.s1b: rows += safe(s1b, pd.read_csv(a.s1b), ["H1b-1", "H1b-2", "H1b-3", "H1b-4"])
+        if a.s1b:
+            d = pd.read_csv(a.s1b)
+            rows += safe(s1b, d, ["H1b-1", "H1b-2", "H1b-3", "H1b-4"])
+            if a.s1b_levels:
+                d = d.merge(pd.read_csv(a.s1b_levels)[["file", "l2plus"]], on="file")
+                rows += safe(lambda x: s1b(x, "l2plus", "-L2+"), d.assign(rubricated=d.l2plus),
+                             ["H1b-1-L2+", "H1b-2-L2+", "H1b-3-L2+", "H1b-4-L2+"])
         if a.s1bt:
             d = pd.read_csv(a.s1bt); d["rubricated"] = (d.rubric_clauses > 0).astype(float)
             rows += safe(s1bt, d, ["H1b-5"])
