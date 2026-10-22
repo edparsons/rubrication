@@ -70,3 +70,12 @@ silent.
   sizes per model are unchanged; the total grows by one model's worth of runs. Hypotheses, outcomes, thresholds,
   prompts and the Holm correction are unchanged. Reason: author's choice to cover two open-weights families.
   Exact model IDs are recorded in `runs/RUNLOG.md`.
+- 2026-10-21 (before any run). Study 1 gains a third agent, pi (pi.dev, v0.85.1), run twice: on GLM 5.3 (`pi-glm`)
+  and on DeepSeek 4.1 Flash (`pi-deepseek`), both via LunaRoute. pi uses its four built-in tools only
+  (read, bash, edit, write); LunaRoute extension tools (web search, images) are disabled. Study 1 grows from 138 to
+  276 runs; measures and analysis (descriptive proportions by agent and family) are unchanged. pi runs in text mode,
+  so, as for Codex, scripts are taken from the `.py` files left in the working directory and `rubric_first_script`
+  is not available.
+- 2026-10-21 (before any run). Claude Code in Study 1 runs with `--bare` and `--model claude-opus-5-5`. Reason: without
+  `--bare` the headless agent loads the operator's personal plugins, hooks and memory, which would leak into the
+  agent's behaviour; the model is pinned so the run is reproducible.

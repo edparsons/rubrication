@@ -21,9 +21,13 @@ from .harness import data_file
 AGENT_CMDS = {
     # Claude Code headless mode; stream-json keeps every tool call (Bash/Write inputs) in the log.
     "claude": ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
-               "--dangerously-skip-permissions"],
+               "--dangerously-skip-permissions", "--bare", "--model", "claude-opus-5-5"],
     # OpenAI Codex CLI non-interactive mode (verify flags for your installed version).
     "codex": ["codex", "exec", "--full-auto", "{prompt}"],
+    # pi (pi.dev) on LunaRoute open-weights models; built-in tools only, no user skills/context/session files.
+    **{f"pi-{k}": ["pi", "-p", "--provider", "lunaroute", "--model", m, "--tools", "read,bash,edit,write",
+                   "--no-session", "--no-context-files", "--no-skills", "--no-prompt-templates", "{prompt}"]
+       for k, m in {"glm": "glm-5.3", "deepseek": "deepseek-4.1-flash"}.items()},
 }
 
 
