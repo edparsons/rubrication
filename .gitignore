@@ -5,3 +5,4 @@ __pycache__/
 instances/
 runs/**/*.json
 !runs/s1_label_sample.json
+.env

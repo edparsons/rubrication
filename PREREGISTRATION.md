@@ -64,4 +64,9 @@ silent.
 - Unanswered runs (no parseable JSON block) count as incorrect for accuracy outcomes and are reported separately.
 
 ## Deviations
-(none yet)
+- 2026-10-21 (before any run). Two open-weights models instead of one: GLM 5.3 and DeepSeek 4.1 (Flash), both served
+  by LunaRoute's OpenAI-compatible gateway (`--provider compat`). Both are confirmatory: each enters the Study 2-4 GEE
+  models as a level of the model fixed effect, alongside the Anthropic (claude-opus-5-5) and OpenAI models. Sample
+  sizes per model are unchanged; the total grows by one model's worth of runs. Hypotheses, outcomes, thresholds,
+  prompts and the Holm correction are unchanged. Reason: author's choice to cover two open-weights families.
+  Exact model IDs are recorded in `runs/RUNLOG.md`.
