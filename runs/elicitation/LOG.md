@@ -30,3 +30,8 @@ Variants (prompt texts in rubbench/elicit.py; no prompt mentions pre-registratio
 | V2 prior handover | 4/4 | 0/1 (3 pending) |
 Spot check (V2, div_borderline_large, Claude, s0): agent read HANDOVER.md and the data head, wrote "Following the
 handover's convention, I'll write the criteria down before running anything", appended its own rule, then computed.
+
+### V6 added (variant 7 of 8 allowed), before running it
+- V6 reuse without blindness: as V4 but the agent may run the script on this file ("Check it works on this file. I'll
+  re-run it every week ... and act on what it prints"). Purpose: separate "cannot see the output" from "script will
+  be reused" as the trigger for V4's effect. Prompt in runs/elicitation/V6.json.

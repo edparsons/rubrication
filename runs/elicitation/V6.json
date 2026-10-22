@@ -1,0 +1,2 @@
+{"V6": {"note": "reuse without blindness: agent may run the script here; the user re-runs it weekly and acts on what it prints",
+        "prompt": "File: returns.csv with columns `strategy` and `spy` (daily-style simple returns, one row per period).\nWrite an analysis script, analyze.py, that answers: is this strategy diversifying me against SPY? Check it works on this file. I'll re-run it every week as new data arrives and act on what it prints.\n\nThe data file is in the current directory."}}
