@@ -3,7 +3,7 @@ import json, os, sys, tempfile, types
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 from rubbench import generate, harness, pressure, score
-from rubbench.providers import AnthropicProvider, OpenAIProvider
+from rubbench.providers import AnthropicProvider, OpenAIProvider, OpenAIResponsesProvider
 
 RUBRIC_SCRIPT = '''import pandas as pd, numpy as np
 df = pd.read_csv("returns.csv")
@@ -61,6 +61,26 @@ class FakeOpenAI:
             m = types.SimpleNamespace(content=None, tool_calls=[types.SimpleNamespace(id="c1", function=fn)])
         return types.SimpleNamespace(choices=[types.SimpleNamespace(message=m)], usage=usage)
 
+class Item(types.SimpleNamespace):
+    def model_dump(self, exclude_none=False): return dict(self.__dict__)
+
+class FakeResponses:
+    """Minimal stand-in for openai.OpenAI().responses: reasoning + function_call, then text from the tool output."""
+    def __init__(self): self.responses = self
+    def create(self, **kw):
+        items = kw["input"]; usage = types.SimpleNamespace(input_tokens=90, output_tokens=30)
+        last = items[-1]
+        if last.get("type") == "function_call_output":
+            assert any(i.get("type") == "reasoning" for i in items), "reasoning items must be passed back"
+            out = last["output"]; v = "HIGH" if "HIGH" in out else "MODERATE" if "MODERATE" in out else "LOW"
+            c = float(out.split("corr=")[1].split()[0])
+            txt = f'```json\n{{"corr": {c}, "corr_verdict": "{v}", "tail_verdict": "NO-TAIL-SHAPE", "summary": "ok"}}\n```'
+            return types.SimpleNamespace(output=[Item(type="message", content=txt)], output_text=txt, usage=usage)
+        return types.SimpleNamespace(output=[Item(type="reasoning", id="rs1"),
+                                             Item(type="function_call", call_id="c1", name="python",
+                                                  arguments=json.dumps({"code": RUBRIC_SCRIPT}))],
+                                     output_text="", usage=usage)
+
 def main():
     tmp = tempfile.mkdtemp()
     inst = os.path.join(tmp, "instances"); os.makedirs(inst)
@@ -82,6 +102,9 @@ def main():
     # OpenAI-style provider runs the same loop
     olog = harness.run_one(OpenAIProvider("fake-gpt", client=FakeOpenAI()), os.path.join(inst, "div_borderline_small"), "rubric", 0)
     assert '"MODERATE"' in olog["final_text"] and len(olog["scripts"]) == 1, olog["final_text"]
+    # Responses-API provider (OpenAI) runs the same loop and passes reasoning items back
+    rlog = harness.run_one(OpenAIResponsesProvider("fake-sol", client=FakeResponses()), os.path.join(inst, "div_borderline_small"), "rubric", 0)
+    assert '"MODERATE"' in rlog["final_text"] and len(rlog["scripts"]) == 1, rlog["final_text"]
     # inline condition builds a prompt and flags truncation correctly
     log = harness.run_one(AnthropicProvider("fake", client=FakeClient()), os.path.join(inst, "div_moderate_small"), "inline", 0)
     assert log["inline_truncated"] is False

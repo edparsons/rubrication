@@ -1,7 +1,7 @@
 """Model providers behind one small interface, so every study runs the same loop on every model.
 
   anthropic  Anthropic Messages API            env: ANTHROPIC_API_KEY
-  openai     OpenAI Chat Completions API       env: OPENAI_API_KEY
+  openai     OpenAI Responses API              env: OPENAI_API_KEY
   compat     any OpenAI-compatible endpoint     env: COMPAT_BASE_URL, COMPAT_API_KEY
              (open-weights models served by vLLM, Together, Fireworks, etc.)
 
@@ -133,5 +133,54 @@ class _OpenAIConv:
             self.messages.append({"role": "tool", "tool_call_id": cid, "content": out})
 
 
+# ------------------------------------------------------------------ OpenAI Responses API
+class OpenAIResponsesProvider:
+    """OpenAI models via /v1/responses: current reasoning models (e.g. gpt-5.6-sol) reject function tools with
+    reasoning on /v1/chat/completions. Reasoning stays at the model default; reasoning items are passed back each turn."""
+
+    def __init__(self, model, client=None, max_tokens=4096):
+        if client is None:
+            import openai
+            client = openai.OpenAI()
+        self.client, self.model, self.max_tokens = client, model, max_tokens
+
+    def _create(self, items, tools=None):
+        kw = dict(model=self.model, input=items, max_output_tokens=self.max_tokens)
+        if tools:
+            kw["tools"] = [{"type": "function", "name": t["name"], "description": t["description"],
+                            "parameters": t["input_schema"]} for t in tools]
+        return self.client.responses.create(**kw)
+
+    def start(self, prompt, tools):
+        return _ResponsesConv(self, prompt, tools)
+
+    def chat(self, messages):
+        r = self._create(messages)
+        return r.output_text or "", {"input": r.usage.input_tokens, "output": r.usage.output_tokens}
+
+
+class _ResponsesConv:
+    def __init__(self, p, prompt, tools):
+        self.p, self.tools = p, tools
+        self.messages = [{"role": "user", "content": prompt}]
+
+    def step(self):
+        r = self.p._create(self.messages, self.tools)
+        self.messages += [o.model_dump(exclude_none=True) for o in r.output]
+        calls = []
+        for o in r.output:
+            if o.type == "function_call":
+                try:
+                    args = json.loads(o.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                calls.append((o.call_id, o.name, args))
+        return Turn(texts=[r.output_text] if r.output_text else [], calls=calls,
+                    usage={"input": r.usage.input_tokens, "output": r.usage.output_tokens}, done=not calls)
+
+    def add_results(self, results):
+        self.messages += [{"type": "function_call_output", "call_id": cid, "output": out} for cid, out in results]
+
+
 def make_provider(name, model):
-    return {"anthropic": AnthropicProvider, "openai": OpenAIProvider, "compat": CompatProvider}[name](model)
+    return {"anthropic": AnthropicProvider, "openai": OpenAIResponsesProvider, "compat": CompatProvider}[name](model)

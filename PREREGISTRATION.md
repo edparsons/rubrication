@@ -84,3 +84,9 @@ silent.
   Caching does not change what the model sees or outputs. The usage log keeps `input` = total prompt tokens
   (uncached + cache read + cache write), so the `input_tokens` outcome has the same meaning for every provider
   (OpenAI's `prompt_tokens` already includes cached tokens).
+- 2026-10-21 (before any run). Harness: the `openai` provider uses the OpenAI Responses API (`/v1/responses`) instead
+  of Chat Completions. Reason: gpt-5.6-sol rejects function tools with reasoning on `/v1/chat/completions`, so every
+  tool condition (rows, code, rubric; Study 4) would have failed; the only alternative there was disabling reasoning,
+  which would make it the one model run without reasoning. Reasoning stays at the model default, and reasoning items
+  are passed back each turn. Prompts, tools, turn limit and max output tokens (4096) are unchanged. The `compat`
+  provider (LunaRoute) still uses Chat Completions. Smoke test extended with a fake Responses client.
