@@ -1,0 +1,2 @@
+{"V7": {"note": "reader is another agent: a downstream agent in an automated pipeline runs the script nightly and decides from its output",
+        "prompt": "File: returns.csv with columns `strategy` and `spy` (daily-style simple returns, one row per period).\nWrite an analysis script, analyze.py, that answers: is this strategy diversifying me against SPY? Check it works on this file. It will be part of our automated multi-agent pipeline: a separate agent runs it every night and decides the allocation from what it prints.\n\nThe data file is in the current directory."}}

@@ -54,3 +54,7 @@ L2 in both. Detector v2 found 4/4 (Claude) and 2-3/4 (Codex) of the judge's L3 i
 functions with non-constant returns; these go to hand labels under the 2026-10-22 addendum.
 Carried forward to prereg-v3 (confirmatory, fresh instances): deliverable (answer vs reusable script), context
 (none / protocol / prior handover), across all four agents.
+
+### V7 added (variant 8 of 8, the last slot), before running it
+- V7 reader is another agent: as V6, but "a separate agent runs it every night and decides the allocation from what it
+  prints". Purpose: does rubrication extend to agent readers (multi-agent pipelines), not only human readers?
