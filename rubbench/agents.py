@@ -24,8 +24,9 @@ AGENT_CMDS = {
                "--dangerously-skip-permissions", "--model", "claude-opus-5-5"],
     # OpenAI Codex CLI non-interactive mode (verify flags for your installed version).
     "codex": ["codex", "exec", "--full-auto", "{prompt}"],
-    # pi (pi.dev) on LunaRoute open-weights models; built-in tools only, no user skills/context/session files.
-    **{f"pi-{k}": ["pi", "-p", "--provider", "lunaroute", "--model", m, "--tools", "read,bash,edit,write",
+    # pi (pi.dev) on LunaRoute open-weights models; built-in tools only, no user skills/context/session files;
+    # --mode json logs every tool call so the scorer can recover inline scripts, as for Claude Code.
+    **{f"pi-{k}": ["pi", "-p", "--mode", "json", "--provider", "lunaroute", "--model", m, "--tools", "read,bash,edit,write",
                    "--no-session", "--no-context-files", "--no-skills", "--no-prompt-templates", "{prompt}"]
        for k, m in {"glm": "glm-5.3", "deepseek": "deepseek-4.1-flash"}.items()},
 }

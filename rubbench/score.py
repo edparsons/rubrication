@@ -101,6 +101,13 @@ def rubric_clauses(source):
     return n
 
 
+def _script_from_shell(cmd):
+    """Python source run inline by a shell command (python -c '...' or a heredoc), else None."""
+    m = re.search(r"python3?(?:\s+-[A-Za-z]+)*\s+-c\s+(['\"])(.*)\1", cmd, re.S)  # allows flags, e.g. python3 -I -c
+    h = re.search(r"<<\s*['\"]?(\w+)['\"]?\n(.*?)\n\1", cmd, re.S)
+    return m.group(2) if m else h.group(2) if h else None
+
+
 def scripts_from_claude_stream(stdout):
     """Ordered list of Python sources the agent wrote or ran, from Claude Code stream-json output."""
     out = []
@@ -116,15 +123,42 @@ def scripts_from_claude_stream(stdout):
             inp = b.get("input", {})
             if b.get("name") in ("Write", "Edit") and str(inp.get("file_path", "")).endswith(".py"):
                 out.append(inp.get("content") or inp.get("new_string") or "")
-            elif b.get("name") == "Bash":
-                cmd = inp.get("command", "")
-                m = re.search(r"python3?(?:\s+-[A-Za-z]+)*\s+-c\s+(['\"])(.*)\1", cmd, re.S)  # allows flags, e.g. python3 -I -c
-                h = re.search(r"<<\s*['\"]?(\w+)['\"]?\n(.*?)\n\1", cmd, re.S)
-                if m:
-                    out.append(m.group(2))
-                elif h:
-                    out.append(h.group(2))
+            elif b.get("name") == "Bash" and (src := _script_from_shell(inp.get("command", ""))) is not None:
+                out.append(src)
     return out
+
+
+def _pi_messages(stdout):
+    for line in (stdout or "").splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("type") == "agent_end":
+            return ev.get("messages") or []
+    return []
+
+
+def scripts_from_pi_stream(stdout):
+    """Ordered list of Python sources pi wrote or ran, from `pi --mode json` output (agent_end transcript)."""
+    out = []
+    for m in _pi_messages(stdout):
+        for b in m.get("content", []) if m.get("role") == "assistant" and isinstance(m.get("content"), list) else []:
+            if b.get("type") != "toolCall":
+                continue
+            a = b.get("arguments") or {}
+            path = str(a.get("path") or a.get("file_path") or "")
+            if b.get("name") in ("write", "edit") and path.endswith(".py"):
+                out.append(a.get("content") or a.get("newText") or a.get("new_string") or "")
+            elif b.get("name") == "bash" and (src := _script_from_shell(a.get("command", ""))) is not None:
+                out.append(src)
+    return out
+
+
+def final_text_from_pi_stream(stdout):
+    texts = [b.get("text", "") for m in _pi_messages(stdout) if m.get("role") == "assistant"
+             for b in (m.get("content") if isinstance(m.get("content"), list) else []) if b.get("type") == "text"]
+    return texts[-1] if texts else stdout
 
 
 def final_text_from_claude_stream(stdout):
@@ -171,10 +205,13 @@ def score_s1(runs, instances):
     rows = []
     for fn in sorted(glob.glob(os.path.join(runs, "*.json"))):
         r = json.load(open(fn))
-        ordered = scripts_from_claude_stream(r.get("stdout")) if r.get("agent") == "claude" else []
+        agent, out = r.get("agent", ""), r.get("stdout")
+        stream = ((scripts_from_claude_stream, final_text_from_claude_stream) if agent == "claude" else
+                  (scripts_from_pi_stream, final_text_from_pi_stream) if agent.startswith("pi") else None)
+        ordered = stream[0](out) if stream else []
         sources = ordered or list((r.get("files") or {}).values())
         counts = [rubric_clauses(s) for s in sources]
-        ans = final_json(final_text_from_claude_stream(r.get("stdout")) if r.get("agent") == "claude" else r.get("stdout"))
+        ans = final_json(stream[1](out) if stream else out)
         rows.append(dict(instance=r["instance"], family=r.get("family"), agent=r.get("agent"), seed=r.get("seed"),
                          n_scripts=len(sources), used_code=float(len(sources) > 0),
                          rubricated=float(sum(counts) > 0),

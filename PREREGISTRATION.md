@@ -113,3 +113,9 @@ silent.
 - 2026-10-22 (same). Study 2 `inline` runs for claude-opus-5-5 and gpt-5.6-sol go through the providers' Batch APIs
   (`rubbench/batch.py`, 50% price). Inline is a single tool-free request, so prompt, model and output cap are those of
   the tool-loop harness; only the transport differs. Run files carry `"batch": true` and the batch id.
+- 2026-10-22 (pilot; no confirmatory run yet). Study 1, pi: runs use `pi --mode json`, and the scorer reads pi's
+  ordered tool calls from the `agent_end` transcript (bash `python -c`/heredoc scripts and `.py` writes/edits), as it
+  does for Claude Code. Reason: in the pilot, pi ran its analysis inline through bash and left no `.py` files, so the
+  text-mode, file-based scoring recorded `used_code = 0` for runs that clearly used code. As a result
+  `rubric_first_script` is also available for pi (not only Claude Code). Text-mode pilot runs are kept in
+  `runs/errors_first_attempt/pilot_pi_text/`.

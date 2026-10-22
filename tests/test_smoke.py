@@ -94,6 +94,12 @@ def main():
     # Claude Code stream parser finds python -c scripts, including ones run with interpreter flags
     ev = {"message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": 'head x && python3 -I -c "\nprint(1)\n"'}}]}}
     assert score.scripts_from_claude_stream(json.dumps(ev)) == ["\nprint(1)\n"]
+    # pi --mode json: scripts and final answer come from the agent_end transcript
+    pi_ev = {"type": "agent_end", "messages": [{"role": "assistant", "content": [
+        {"type": "toolCall", "name": "bash", "arguments": {"command": "python3 -c 'print(1)'"}}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "done"}]}]}
+    assert score.scripts_from_pi_stream(json.dumps(pi_ev)) == ["print(1)"]
+    assert score.final_text_from_pi_stream(json.dumps(pi_ev)) == "done"
     # harness loop (rubric condition) on two instances
     runs = os.path.join(tmp, "runs"); os.makedirs(runs)
     for name in ("div_borderline_small", "div_neutral_flat_small"):
