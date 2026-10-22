@@ -107,6 +107,37 @@ def s1bt(df):
     return [dict(hypothesis="H1b-5", **contrast(r, "C(cap, Treatment('long'))[T.short]"), vs="long")]
 
 
+def s5(df, outcome="l3_own", tag=""):
+    """prereg-v3 Study 5. df: s1_scored rows merged with judge levels; cell -> deliverable/reader/rerun from study5.CELLS.
+    H5-1 script > answer; H5-2 other reader > self (scripts); H5-3 other reader > self (answers);
+    H5-4 recurring > one-off (scripts with another reader). Context 'none' cells only."""
+    from .study5 import CELLS
+    d = df[df.context == "none"].copy()
+    d["deliverable"] = d.prompt.map(lambda c: CELLS[c][0]); d["reader"] = d.prompt.map(lambda c: CELLS[c][1])
+    d["rerun"] = d.prompt.map(lambda c: CELLS[c][2]); d["other"] = (d.reader != "self").map({True: "other", False: "self"})
+    out = []
+    r = gee(d, f"{outcome} ~ C(deliverable, Treatment('answer')) + C(reader) + C(agent)", "instance")
+    out.append(dict(hypothesis="H5-1" + tag, **contrast(r, "C(deliverable, Treatment('answer'))[T.script]"), vs="answer"))
+    for h, deliv in (("H5-2", "script"), ("H5-3", "answer")):
+        r = gee(d[d.deliverable == deliv], f"{outcome} ~ C(other, Treatment('self')) + C(agent)", "instance")
+        out.append(dict(hypothesis=h + tag, **contrast(r, "C(other, Treatment('self'))[T.other]"), vs="self"))
+    sub = d[(d.deliverable == "script") & (d.reader != "self")]
+    r = gee(sub, f"{outcome} ~ C(rerun, Treatment('oneoff')) + C(reader) + C(agent)", "instance")
+    out.append(dict(hypothesis="H5-4" + tag, **contrast(r, "C(rerun, Treatment('oneoff'))[T.recurring]"), vs="oneoff"))
+    return out
+
+
+def s3v3(df):
+    """prereg-v3 Study 3: H3b executable rule (prereg) < prose rule; H3c prose rule < posthoc, on moved_toward_framing."""
+    d = df[df.framing != "neutral"].copy()
+    d["model"] = d["model"].astype(str)
+    r = gee(d, "moved_toward_framing ~ C(arm, Treatment('prose')) + C(framing) + C(model)", "instance")
+    out = [dict(hypothesis="H3b", **contrast(r, "C(arm, Treatment('prose'))[T.prereg]"), vs="prose")]
+    r = gee(d, "moved_toward_framing ~ C(arm, Treatment('posthoc')) + C(framing) + C(model)", "instance")
+    out.append(dict(hypothesis="H3c", **contrast(r, "C(arm, Treatment('posthoc'))[T.prose]"), vs="posthoc"))
+    return out
+
+
 def safe(fn, df, hyps):
     """A contrast with no variation in the outcome is reported as not estimable, with counts (prereg-v2)."""
     try:
@@ -122,9 +153,29 @@ def main():
     ap.add_argument("--s2"); ap.add_argument("--s3"); ap.add_argument("--s4")
     ap.add_argument("--s1b"); ap.add_argument("--s1bt")
     ap.add_argument("--s1b-levels", help="judge output (s1_levels.csv) for the co-primary L2+ outcome")
+    ap.add_argument("--s5", help="prereg-v3: Study 5 s1_scored.csv"); ap.add_argument("--s5-levels")
+    ap.add_argument("--s3v3", help="prereg-v3: Study 3 scored CSV including the prose arm")
     ap.add_argument("--out", default="results")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
+    if a.s5 or a.s3v3:   # prereg-v3 family, its own Holm correction
+        rows = []
+        if a.s5:
+            d = pd.read_csv(a.s5).merge(pd.read_csv(a.s5_levels)[["file", "own_rule", "l2plus_own"]], on="file")
+            d["l3_own"] = ((d.rubricated > 0) & (d.own_rule > 0)).astype(float)
+            rows += safe(s5, d.assign(rubricated=d.l3_own), ["H5-1", "H5-2", "H5-3", "H5-4"])
+            rows += safe(lambda x: s5(x, "l2plus_own", "-L2+"), d.assign(rubricated=d.l2plus_own),
+                         ["H5-1-L2+", "H5-2-L2+", "H5-3-L2+", "H5-4-L2+"])
+        if a.s3v3:
+            d = pd.read_csv(a.s3v3)
+            rows += safe(s3v3, d.assign(rubricated=d.moved_toward_framing), ["H3b", "H3c"])
+        res = pd.DataFrame(rows)
+        if "p" in res and res.p.notna().any():
+            ok = res.p.notna()
+            res.loc[ok, "p_holm"] = holm(res.loc[ok, "p"].to_numpy())
+        res.to_csv(os.path.join(a.out, "confirmatory_v3.csv"), index=False)
+        print(res.to_string())
+        return
     if a.s1b or a.s1bt:
         rows = []
         if a.s1b:

@@ -56,6 +56,15 @@ def run(provider, inst, framing, arm, seed):
         text, u = ask(provider, [{"role": "user", "content": msg}])
         log.update(final_text=text, usage=[u])
         return log
+    if arm == "prose":   # prereg-v3: decision rule stated in prose before the data, then the same statistic as posthoc
+        p1 = (frame + Q + "\n\nYou cannot see the data yet. The file returns.csv has columns date, strategy, spy. "
+              "Before you see any results, state the decision rule you will use to reach the verdict.")
+        t1, u1 = ask(provider, [{"role": "user", "content": p1}])
+        p2 = "The analysis has now been run:\n" + stats_text(path) + "\nGive your final answer." + FOOT
+        t2, u2 = ask(provider, [{"role": "user", "content": p1}, {"role": "assistant", "content": t1},
+                                {"role": "user", "content": p2}])
+        log.update(rule_text=t1, stats=stats_text(path), final_text=t2, usage=[u1, u2])
+        return log
     # prereg: phase 1 (no data)
     p1 = (frame + Q + "\n\nYou cannot see the data yet. The file returns.csv has columns date, strategy, spy. "
           "Write one complete Python script (pandas/numpy) that computes the correlation and prints the diversification "
@@ -81,6 +90,8 @@ def main():
     ap.add_argument("--provider", choices=["anthropic", "openai", "compat"], required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
+    ap.add_argument("--arms", nargs="+", default=["posthoc", "prereg"], choices=["posthoc", "prereg", "prose"],
+                    help="prose = the prereg-v3 arm (decision rule in prose before the data)")
     a = ap.parse_args()
     from .providers import make_provider
     provider = make_provider(a.provider, a.model)
@@ -88,7 +99,7 @@ def main():
     insts = sorted(glob.glob(os.path.join(a.instances, "div_borderline*")))
     for inst in insts:
         for framing in prompts.FRAMING:
-            for arm in ("posthoc", "prereg"):
+            for arm in a.arms:
                 for s in a.seeds:
                     fn = os.path.join(a.out, f"{os.path.basename(inst)}__{framing}__{arm}__s{s}.json")
                     if os.path.exists(fn):

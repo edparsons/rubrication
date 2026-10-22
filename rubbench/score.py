@@ -351,7 +351,7 @@ def score_s1(runs, instances, labels=None):
         ran_python = any(PYTHON_RE.search(c) for c in shell_commands(agent, out))
         label = hand.get(os.path.basename(fn))   # hand label L0-L3, required for every detector positive
         rows.append(dict(file=os.path.basename(fn), instance=r["instance"], family=r.get("family"), agent=agent,
-                         seed=r.get("seed"), prompt=prompt, context=r.get("context", "none"),
+                         seed=r.get("seed"), prompt=prompt, context=r.get("s5_context") or r.get("context", "none"),
                          size="large" if r["instance"].endswith("_large") else "small",
                          n_scripts=len(sources), n_other_programs=len(other),
                          used_code=float(bool(sources) or bool(other) or ran_python),

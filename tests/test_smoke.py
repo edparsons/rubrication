@@ -168,6 +168,21 @@ def main():
     assert score.rubric_clauses_v2(RUBRIC_SCRIPT) == 3 and score.rubric_clauses_v2(PLAIN_SCRIPT) == 0
     d1b["l2plus"] = d1b.rubricated
     assert [r["hypothesis"] for r in analysis.s1b(d1b, "l2plus", "-L2+")][0] == "H1b-1-L2+"
+    # prereg-v3: Study 5 prompts never name thresholds or verdict sentences, always ask for Python; analyses run
+    from rubbench import study5
+    for fam in ("div", "cal"):
+        for c in study5.CELLS:
+            p = study5.build_prompt(fam, c)
+            assert "Use Python" in p and "threshold" not in p.lower() and "pre-regist" not in p.lower(), p
+    assert len(study5.design()) == 14
+    d5 = pd.DataFrame([dict(file=f"f{i}", instance=f"i{i % 4}", agent=g, prompt=c, context="none",
+                            l3_own=float(rng2.random() < (0.7 if study5.CELLS[c][0] == "script" else 0.2)))
+                       for i, (c, g, _) in enumerate(itertools.product(study5.CELLS, ["a", "b"], range(6)))])
+    assert [r["hypothesis"] for r in analysis.s5(d5)] == ["H5-1", "H5-2", "H5-3", "H5-4"]
+    d3 = pd.DataFrame([dict(instance=f"i{i % 4}", framing=f, arm=a, model="m",
+                            moved_toward_framing=float(rng2.random() < {"posthoc": .5, "prose": .35, "prereg": .1}[a]))
+                       for i, (f, a, _) in enumerate(itertools.product(["hope_high", "hope_low"], ["posthoc", "prose", "prereg"], range(20)))])
+    assert [r["hypothesis"] for r in analysis.s3v3(d3)] == ["H3b", "H3c"]
     print("SMOKE TEST PASSED")
 
 if __name__ == "__main__":
