@@ -45,7 +45,8 @@ def run(agent, inst, seed, timeout=1800):
         cfg = tempfile.mkdtemp(prefix="rub1_cfg_")
         env = {**os.environ, "CLAUDE_CONFIG_DIR": cfg}
     try:
-        r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout, env=env)
+        r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout, env=env,
+                           stdin=subprocess.DEVNULL)
         stdout, stderr, code = r.stdout, r.stderr, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, stderr, code = (e.stdout or ""), "[timeout]", -1

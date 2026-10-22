@@ -118,7 +118,7 @@ def scripts_from_claude_stream(stdout):
                 out.append(inp.get("content") or inp.get("new_string") or "")
             elif b.get("name") == "Bash":
                 cmd = inp.get("command", "")
-                m = re.search(r"python3?\s+-c\s+(['\"])(.*)\1", cmd, re.S)
+                m = re.search(r"python3?(?:\s+-[A-Za-z]+)*\s+-c\s+(['\"])(.*)\1", cmd, re.S)  # allows flags, e.g. python3 -I -c
                 h = re.search(r"<<\s*['\"]?(\w+)['\"]?\n(.*?)\n\1", cmd, re.S)
                 if m:
                     out.append(m.group(2))

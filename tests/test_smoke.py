@@ -91,6 +91,9 @@ def main():
     assert score.rubric_clauses(RUBRIC_SCRIPT) == 3, score.rubric_clauses(RUBRIC_SCRIPT)
     assert score.rubric_clauses(PLAIN_SCRIPT) == 0
     assert score.rubric_clauses('x=0.3\nprint("LOW risk" if x < 0.5 else "HIGH risk")') == 1
+    # Claude Code stream parser finds python -c scripts, including ones run with interpreter flags
+    ev = {"message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": 'head x && python3 -I -c "\nprint(1)\n"'}}]}}
+    assert score.scripts_from_claude_stream(json.dumps(ev)) == ["\nprint(1)\n"]
     # harness loop (rubric condition) on two instances
     runs = os.path.join(tmp, "runs"); os.makedirs(runs)
     for name in ("div_borderline_small", "div_neutral_flat_small"):

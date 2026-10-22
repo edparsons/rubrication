@@ -99,3 +99,8 @@ silent.
   exhaust 32000 on `inline` small because they compute the statistics by hand in their reasoning. That is model
   behaviour in the no-tools condition, so those runs remain unanswered (= incorrect) as pre-registered; the cap is
   the same for all models. Pilot runs made under the 4096 cap are kept in `runs/errors_first_attempt/pilot_cap4096/`.
+- 2026-10-22 (pilot; no confirmatory run yet). Scorer bug fix (Study 1): `scripts_from_claude_stream` only matched
+  `python -c`/`python3 -c`, so it missed scripts Claude Code ran as `python3 -I -c "..."` and scored the pilot run as
+  `used_code = 0`. The pattern now allows interpreter flags before `-c`; the smoke test checks it. Also: agents get an
+  empty stdin (`stdin=DEVNULL`) so Claude Code no longer waits 3 s for piped input. Claude Code CLI updated from
+  2.1.270 to 2.1.307, the first installed version that accepts `claude-opus-5-5`.
