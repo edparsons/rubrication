@@ -35,3 +35,22 @@ handover's convention, I'll write the criteria down before running anything", ap
 - V6 reuse without blindness: as V4 but the agent may run the script on this file ("Check it works on this file. I'll
   re-run it every week ... and act on what it prints"). Purpose: separate "cannot see the output" from "script will
   be reused" as the trigger for V4's effect. Prompt in runs/elicitation/V6.json.
+
+### Final, 2026-10-22T19:54:34Z (56 runs, 7 of 8 variant slots used; search closed. API ~$8.10 for runs plus judge calls)
+Own-rule L2+ (judge; L3 = judge level L3), 4 runs per cell, seed-1 instances. Not yet hand-checked beyond spot checks.
+| variant | Claude Code | Codex | judge L3 |
+|---|---|---|---|
+| V0 control (answer the verdict question) | 0/4 | 0/4 | 0/8 |
+| V1 protocol context | 4/4 | 4/4 | 1/8 |
+| V2 prior handover (precedent only) | 4/4 | 0/4 (read it, did not follow) | 0/8 |
+| V3 hypothesis framing | 0/4 | 0/4 | 0/8 |
+| V4 write analyze.py, do not run it | 4/4 | 4/4 | 8/8 |
+| V5 decision at stake | 1/4 | 0/4 | 0/8 |
+| V6 write analyze.py, may run it, re-run weekly | 4/4 | 4/4 | 8/8 |
+Reading (exploratory): the deliverable drives L3 - when the agent's output is a script that someone will run and act
+on (V4, V6), both agents rubricate with their own thresholds; when the output is an answer (V0, V3, V5) they do not.
+A precedent in project memory (V2) elicits own-rule L2 in Claude Code but not Codex. An explicit protocol (V1) elicits
+L2 in both. Detector v2 found 4/4 (Claude) and 2-3/4 (Codex) of the judge's L3 in V4/V6; the misses are verdict
+functions with non-constant returns; these go to hand labels under the 2026-10-22 addendum.
+Carried forward to prereg-v3 (confirmatory, fresh instances): deliverable (answer vs reusable script), context
+(none / protocol / prior handover), across all four agents.
