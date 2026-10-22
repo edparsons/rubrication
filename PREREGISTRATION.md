@@ -92,3 +92,10 @@ silent.
   which would make it the one model run without reasoning. Reasoning stays at the model default, and reasoning items
   are passed back each turn. Prompts, tools, turn limit and max output tokens (4096) are unchanged. The `compat`
   provider (LunaRoute) still uses Chat Completions. Smoke test extended with a fake Responses client.
+- 2026-10-22 (pilot; no confirmatory run yet). Harness: per-request output cap raised from 4096 to 32000 tokens for
+  every provider (reasoning included), with a 30-minute request timeout. Reason: in the pilot, Opus 5.5, gpt-5.6-sol
+  and GLM 5.3 all spent the 4096 tokens on reasoning and never wrote an answer, so every run would have been
+  "unanswered" by construction. At 16000 Opus and Sol answer (~5.6k tokens); GLM 5.3 and DeepSeek 4.1 Flash still
+  exhaust 32000 on `inline` small because they compute the statistics by hand in their reasoning. That is model
+  behaviour in the no-tools condition, so those runs remain unanswered (= incorrect) as pre-registered; the cap is
+  the same for all models. Pilot runs made under the 4096 cap are kept in `runs/errors_first_attempt/pilot_cap4096/`.

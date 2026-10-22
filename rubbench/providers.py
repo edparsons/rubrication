@@ -15,6 +15,10 @@ import json
 import os
 from dataclasses import dataclass, field
 
+# per-request output cap, reasoning included. 4096 left reasoning models no room to answer (pilot, 2026-10-22).
+MAX_OUTPUT = 32000
+TIMEOUT = 1800   # seconds per request; long reasoning at 32k output can exceed the SDKs' 10-minute default
+
 
 @dataclass
 class Turn:
@@ -26,17 +30,17 @@ class Turn:
 
 # ------------------------------------------------------------------ Anthropic
 class AnthropicProvider:
-    def __init__(self, model, client=None, max_tokens=4096):
+    def __init__(self, model, client=None, max_tokens=MAX_OUTPUT):
         if client is None:
             import anthropic
-            client = anthropic.Anthropic()
+            client = anthropic.Anthropic(timeout=TIMEOUT)
         self.client, self.model, self.max_tokens = client, model, max_tokens
 
     def start(self, prompt, tools):
         return _AnthropicConv(self, prompt, tools)
 
     def chat(self, messages):
-        r = self.client.messages.create(model=self.model, max_tokens=self.max_tokens, messages=messages)
+        r = self.client.messages.create(model=self.model, max_tokens=self.max_tokens, messages=messages, timeout=TIMEOUT)
         text = "".join(b.text for b in r.content if b.type == "text")
         return text, {"input": r.usage.input_tokens, "output": r.usage.output_tokens}
 
@@ -50,7 +54,7 @@ class _AnthropicConv:
         # auto prompt caching: cost only, outputs unchanged. "input" stays total prompt tokens (cached + uncached),
         # matching OpenAI's prompt_tokens, so the input_tokens outcome means the same thing for every provider.
         kw = dict(model=self.p.model, max_tokens=self.p.max_tokens, messages=self.messages,
-                  cache_control={"type": "ephemeral"})
+                  cache_control={"type": "ephemeral"}, timeout=TIMEOUT)
         if self.tools:
             kw["tools"] = self.tools
         r = self.p.client.messages.create(**kw)
@@ -75,10 +79,10 @@ class _AnthropicConv:
 class OpenAIProvider:
     token_param = "max_completion_tokens"   # current OpenAI models
 
-    def __init__(self, model, client=None, base_url=None, api_key=None, max_tokens=4096):
+    def __init__(self, model, client=None, base_url=None, api_key=None, max_tokens=MAX_OUTPUT):
         if client is None:
             import openai
-            client = openai.OpenAI(base_url=base_url, api_key=api_key) if base_url else openai.OpenAI()
+            client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=TIMEOUT) if base_url else openai.OpenAI(timeout=TIMEOUT)
         self.client, self.model, self.max_tokens = client, model, max_tokens
 
     def _create(self, messages, tools=None):
@@ -100,7 +104,7 @@ class OpenAIProvider:
 class CompatProvider(OpenAIProvider):
     token_param = "max_tokens"              # most OpenAI-compatible servers
 
-    def __init__(self, model, client=None, max_tokens=4096):
+    def __init__(self, model, client=None, max_tokens=MAX_OUTPUT):
         super().__init__(model, client=client, base_url=os.environ.get("COMPAT_BASE_URL"),
                          api_key=os.environ.get("COMPAT_API_KEY"), max_tokens=max_tokens)
 
@@ -138,10 +142,10 @@ class OpenAIResponsesProvider:
     """OpenAI models via /v1/responses: current reasoning models (e.g. gpt-5.6-sol) reject function tools with
     reasoning on /v1/chat/completions. Reasoning stays at the model default; reasoning items are passed back each turn."""
 
-    def __init__(self, model, client=None, max_tokens=4096):
+    def __init__(self, model, client=None, max_tokens=MAX_OUTPUT):
         if client is None:
             import openai
-            client = openai.OpenAI()
+            client = openai.OpenAI(timeout=TIMEOUT)
         self.client, self.model, self.max_tokens = client, model, max_tokens
 
     def _create(self, items, tools=None):
