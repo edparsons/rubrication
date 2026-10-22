@@ -1,7 +1,7 @@
 # Pre-registration amendment v3: what triggers rubrication, and does an executable rule resist pressure?
 
-**Status: DRAFT for the author's review (2026-10-22). Binding only once committed and tagged `prereg-v3` on GitHub.**
-No Study 5 run, no Study 3 run, and no scoring of Study 1 or 1b happens before that tag. Studies 1, 1b, 2 and 4 and
+**Registered 2026-10-22 as git tag `prereg-v3`, after the author approved the draft and the mechanics check below.**
+No Study 5 run, no Study 3 run, and no scoring of Study 1 or 1b happened before that tag. Studies 1, 1b, 2 and 4 and
 the existing Study 3 arms, hypotheses and analyses are unchanged.
 
 ## Why this amendment
@@ -107,9 +107,12 @@ The prereg-v3 contrasts form their own Holm family of 10: H5-1 to H5-4 for each 
 
 ## Procedure, exclusions and cost
 
-- **Mechanics check before the tag (excluded):** one run per new cell per agent on seed-1 instances, to confirm the
-  prompts run, scripts are written, and pi loads the context files. Kept in `runs/pilot/s5/`; no outcome from it is
-  analysed.
+- **Mechanics check before the tag (excluded; done):** every cell-context pair once per agent on
+  `instances_s1/div_moderate_convex_small` (56 runs, `runs/pilot/s5/`), plus 24 prose-arm runs for Opus and Sol on
+  seed-1 instances (`runs/pilot/s3_prose/`) with the rule judge. All exited cleanly; every script cell left a script
+  (pi + DeepSeek sometimes names it `analysis.py`; the scorer reads every `.py` file and the command log, so the name
+  does not matter); every handover run read HANDOVER.md. Only outcomes of mechanics were inspected (exit codes, files
+  written, context read); no rubrication outcome from the check is analysed.
 - Harness errors are re-run once; if they fail again they are reported as failures. Unanswered runs are reported
   separately.
 - Cost estimate: Study 5 ~$20-30 of API spend (Claude Code and Codex; pi on LunaRoute adds none); the Study 3 prose arm
