@@ -135,12 +135,19 @@ Study 1b-T: `python -m rubbench.harness --provider <p> --model <m> --out runs/s1
      tool calls before the first tool output and (B) all programs, never the final answer.
   3. **L3 detector v2** (`score.rubric_clauses_v2`): a verdict may also be gated by any ordering comparison (not only
      one against a numeric literal) or by a stored predicate (`c1 = S > L; "PASS" if c1 else "FAIL"`, flags set inside
-     a threshold `if`, lists built from predicates). The registered detector (v1) missed both real-world L3 scripts in
-     the fixtures. v1 is still computed and reported as a secondary measure (`rubricated_v1`).
+     a threshold `if`, lists built from predicates), and a gated branch may assign a label instead of printing it
+     (`if abs(corr) < 0.10: v = "HIGH"`; added the same day after a judge pilot on excluded pilot runs). The registered
+     detector (v1) missed both real-world L3 scripts in the fixtures. v1 is still computed and reported as a secondary measure (`rubricated_v1`).
   4. **Every detector positive (v1 or v2) is hand-labelled** (L0-L3), as is every run with non-Python code, in addition
      to the registered random 20% sample. The primary L3 outcome is the hand label where one exists; the detector's
      call is provisional until then. Both detectors' precision is reported against the labels; recall is estimated
      from the random 20% sample. Labels are made blind to agent, prompt and context.
+  6. **The judge also sees the task prompt and records `own_rule`**: whether at least one interpretation rule,
+     threshold or decision criterion at L2/L3 is the agent's own rather than given in the prompt (P1 prompts supply
+     the thresholds, so restating them is not pre-registration by the agent). The co-primary L2+ outcome is therefore
+     reported both as stated and as `l2plus_own` (L2+ with an own rule); `l2plus_own` is the measure of the author's
+     claim that agents pre-register their own analyses. In H1b-1 to H1b-4 the L2+ contrasts use `l2plus_own`.
+     Added the same day, after a judge pilot on the 12 excluded pilot runs and before any Study 1/1b scoring.
   5. **New flag `unconditional_claim`** (judged): a fixed sentence in code that asserts a result about the data
      whatever the data shows (e.g. "IDENTICAL for both dates"). Reported descriptively by agent and condition; no
      hypothesis.

@@ -163,6 +163,7 @@ def main():
     fx = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
     v2 = {f: score.rubric_clauses_v2(open(os.path.join(fx, f)).read()) for f in os.listdir(fx) if f.endswith(".py")}
     assert v2["gappers_pass241_like.py"] > 0 and v2["gappers_coverage_flag_like.py"] > 0, v2
+    assert v2["label_assignment_like.py"] > 0, v2
     assert v2["gappers_depth_table_like.py"] == 0 and v2["gappers_lucky_cells_like.py"] == 0, v2
     assert score.rubric_clauses_v2(RUBRIC_SCRIPT) == 3 and score.rubric_clauses_v2(PLAIN_SCRIPT) == 0
     d1b["l2plus"] = d1b.rubricated

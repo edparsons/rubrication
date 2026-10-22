@@ -131,8 +131,8 @@ def main():
             d = pd.read_csv(a.s1b)
             rows += safe(s1b, d, ["H1b-1", "H1b-2", "H1b-3", "H1b-4"])
             if a.s1b_levels:
-                d = d.merge(pd.read_csv(a.s1b_levels)[["file", "l2plus"]], on="file")
-                rows += safe(lambda x: s1b(x, "l2plus", "-L2+"), d.assign(rubricated=d.l2plus),
+                d = d.merge(pd.read_csv(a.s1b_levels)[["file", "l2plus_own"]], on="file")
+                rows += safe(lambda x: s1b(x, "l2plus_own", "-L2+"), d.assign(rubricated=d.l2plus_own),
                              ["H1b-1-L2+", "H1b-2-L2+", "H1b-3-L2+", "H1b-4-L2+"])
         if a.s1bt:
             d = pd.read_csv(a.s1bt); d["rubricated"] = (d.rubric_clauses > 0).astype(float)
