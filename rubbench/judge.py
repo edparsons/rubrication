@@ -92,7 +92,19 @@ def judge(text):
     import anthropic
     r = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=4000,
                                               messages=[{"role": "user", "content": PROMPT + text}])
-    out = "".join(b.text for b in r.content if b.type == "text")
+    return parse("".join(b.text for b in r.content if b.type == "text"))
+
+
+def judge_text(r):
+    from . import prompts
+    pre, progs = before_first_output(r), programs(r)
+    task = r.get("prompt_text") or prompts.s1_prompt(r.get("family", "div"), r.get("prompt", "P1"))
+    text = ("(P) TASK PROMPT\n" + task + "\n\n(A) BEFORE ANY TOOL OUTPUT\n" + (pre or "(nothing)")
+            + "\n\n(B) PROGRAMS\n" + (progs or "(none)"))
+    return text if (pre.strip() or progs.strip()) else None
+
+
+def parse(out):
     m = re.search(r"\{.*\}", out, re.S)
     try:
         return json.loads(m.group(0)) if m else {"level": None, "reason": out[:200]}
@@ -100,12 +112,45 @@ def judge(text):
         return {"level": None, "reason": out[:200]}
 
 
+def batch_fill(runs, cache):
+    """Judge every uncached run through the Message Batches API (same model, prompt and input; half price)."""
+    import time
+    import anthropic
+    todo = {}
+    for fn in sorted(glob.glob(os.path.join(runs, "*.json"))):
+        cfn = os.path.join(cache, os.path.basename(fn))
+        if os.path.exists(cfn):
+            continue
+        text = judge_text(json.load(open(fn)))
+        if text is None:
+            json.dump({"level": "L0", "unconditional_claim": False, "reason": "no text or code"}, open(cfn, "w"))
+        else:
+            todo[f"r{len(todo):05d}"] = (cfn, text)
+    if not todo:
+        return
+    c = anthropic.Anthropic()
+    b = c.messages.batches.create(requests=[{"custom_id": cid, "params": {
+        "model": MODEL, "max_tokens": 4000, "messages": [{"role": "user", "content": PROMPT + text}]}}
+        for cid, (cfn, text) in todo.items()])
+    print("judge batch", b.id, len(todo), "requests", flush=True)
+    while c.messages.batches.retrieve(b.id).processing_status != "ended":
+        time.sleep(60)
+    for e in c.messages.batches.results(b.id):
+        if e.result.type == "succeeded":
+            out = "".join(x.text for x in e.result.message.content if x.type == "text")
+            json.dump(parse(out), open(todo[e.custom_id][0], "w"))
+    # anything that errored stays uncached and is judged one by one below
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True)
+    ap.add_argument("--batch", action="store_true", help="judge uncached runs via the Message Batches API first")
     a = ap.parse_args()
     cache = os.path.join(a.runs, "_judge")
     os.makedirs(cache, exist_ok=True)
+    if a.batch:
+        batch_fill(a.runs, cache)
     scored = pd.read_csv(os.path.join(a.runs, "s1_scored.csv")).set_index("file")
     rows = []
     for fn in sorted(glob.glob(os.path.join(a.runs, "*.json"))):
@@ -114,14 +159,8 @@ def main():
         if os.path.exists(cfn):
             j = json.load(open(cfn))
         else:
-            r = json.load(open(fn))
-            pre, progs = before_first_output(r), programs(r)
-            from . import prompts
-            task = r.get("prompt_text") or prompts.s1_prompt(r.get("family", "div"), r.get("prompt", "P1"))
-            text = ("(P) TASK PROMPT\n" + task + "\n\n(A) BEFORE ANY TOOL OUTPUT\n" + (pre or "(nothing)")
-                    + "\n\n(B) PROGRAMS\n" + (progs or "(none)"))
-            j = judge(text) if (pre.strip() or progs.strip()) else {"level": "L0", "unconditional_claim": False,
-                                                                    "reason": "no text or code"}
+            text = judge_text(json.load(open(fn)))
+            j = judge(text) if text else {"level": "L0", "unconditional_claim": False, "reason": "no text or code"}
             json.dump(j, open(cfn, "w"))
         l3 = bool(scored.loc[name, "rubricated"]) if name in scored.index else False
         jl = j.get("level")
