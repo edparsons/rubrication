@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rubrication Labels</title>
+<style>
+  :root { --bg:#fbfaf7; --fg:#1d1d1b; --muted:#6b6a65; --card:#ffffff; --line:#e4e1d8; --accent:#9b2c1f; --code:#f4f2ec; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161614; --fg:#ecebe6; --muted:#a3a19a; --card:#1f1f1c; --line:#33322e; --accent:#e0705f; --code:#262622; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, system-ui, sans-serif; }
+  header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; z-index:1; }
+  h1 { font-size:16px; margin:0 12px 0 0; }
+  .prog { color:var(--muted); }
+  main { max-width:1000px; margin:0 auto; padding:16px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; margin:0 0 16px; }
+  section h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0; padding:10px 14px; border-bottom:1px solid var(--line); }
+  pre { margin:0; padding:12px 14px; background:var(--code); overflow:auto; max-height:60vh; font:12.5px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; word-break:break-word; }
+  .levels { display:flex; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  button.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .help { font-size:13px; color:var(--muted); }
+  .help b { color:var(--fg); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rubrication hand labels</h1>
+  <span class="prog" id="prog"></span>
+  <div class="levels" id="levels"></div>
+  <button id="prev">&larr; Prev</button><button id="next">Next &rarr;</button>
+  <button id="nextun">Next unlabelled</button>
+  <button id="dl">Download labels.csv</button>
+</header>
+<main>
+  <p class="help">Label the <b>highest</b> level present. Keys <b>0-3</b> label, <b>&larr; &rarr;</b> move.
+  <b>L0</b> numbers only. <b>L1</b> fixed explanatory text, no rule stated in advance.
+  <b>L2</b> what outcomes would mean is stated in advance (in (A) or in code/comments), but code does not pick the verdict.
+  <b>L3</b> code picks a verdict sentence or label by threshold comparison (printed, assigned or returned).
+  Guards (e.g. <code>if len(x) &gt; 0</code>) and group definitions are not verdicts.</p>
+  <section><h2>(A) What the agent wrote before its first tool output</h2><pre id="pre"></pre></section>
+  <section><h2>(B) Programs it ran or wrote</h2><pre id="progs"></pre></section>
+</main>
+<script>
+const ITEMS = /*DATA*/[];
+const KEY = "rubrication-labels-v1";
+let labels = {};
+try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+let i = 0;
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch (e) {} };
+const lv = document.getElementById("levels");
+["L0","L1","L2","L3"].forEach((l, k) => {
+  const b = document.createElement("button"); b.textContent = `${k} · ${l}`; b.dataset.l = l;
+  b.onclick = () => setLabel(l); lv.appendChild(b);
+});
+function setLabel(l) { labels[ITEMS[i].item] = l; save(); render(); if (i < ITEMS.length - 1) { i++; render(); } }
+function render() {
+  if (!ITEMS.length) { document.getElementById("prog").textContent = "No items."; return; }
+  const it = ITEMS[i], done = Object.keys(labels).length;
+  document.getElementById("prog").textContent = `Item ${it.item} (${i + 1} of ${ITEMS.length}) · ${done} labelled`;
+  document.getElementById("pre").textContent = it.pre;
+  document.getElementById("progs").textContent = it.programs;
+  lv.querySelectorAll("button").forEach(b => b.classList.toggle("sel", labels[it.item] === b.dataset.l));
+}
+document.getElementById("prev").onclick = () => { if (i > 0) { i--; render(); } };
+document.getElementById("next").onclick = () => { if (i < ITEMS.length - 1) { i++; render(); } };
+document.getElementById("nextun").onclick = () => { const j = ITEMS.findIndex(x => !labels[x.item]); if (j >= 0) { i = j; render(); } };
+document.getElementById("dl").onclick = () => {
+  const csv = "item,label\n" + Object.entries(labels).map(([k, v]) => `${k},${v}`).join("\n") + "\n";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type: "text/csv"}));
+  a.download = "labels.csv"; a.click();
+};
+document.addEventListener("keydown", e => {
+  if (["0","1","2","3"].includes(e.key)) setLabel("L" + e.key);
+  if (e.key === "ArrowRight") document.getElementById("next").click();
+  if (e.key === "ArrowLeft") document.getElementById("prev").click();
+});
+render();
+</script>
+</body>
+</html>
