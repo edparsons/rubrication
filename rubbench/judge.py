@@ -138,7 +138,10 @@ def batch_fill(runs, cache):
     for e in c.messages.batches.results(b.id):
         if e.result.type == "succeeded":
             out = "".join(x.text for x in e.result.message.content if x.type == "text")
-            json.dump(parse(out), open(todo[e.custom_id][0], "w"))
+            j = parse(out)
+            u = e.result.message.usage
+            j["_usage"] = {"input": u.input_tokens, "output": u.output_tokens, "batch": True}   # cost tracking only
+            json.dump(j, open(todo[e.custom_id][0], "w"))
     # anything that errored stays uncached and is judged one by one below
 
 

@@ -42,17 +42,46 @@ def judge(rule, stats, final):
         return {"implied_verdict": None, "rule_used": None}
 
 
+def batch_judge(runs):
+    """{file: judgment} for every prose run, via the Message Batches API (same model and prompt; half price)."""
+    import time
+    import anthropic
+    fns = [fn for fn in sorted(glob.glob(os.path.join(runs, "*__prose__*.json"))) if "error" not in json.load(open(fn))]
+    c = anthropic.Anthropic()
+    reqs = []
+    for k, fn in enumerate(fns):
+        r = json.load(open(fn))
+        reqs.append({"custom_id": f"r{k:05d}", "params": {"model": MODEL, "max_tokens": 4000, "messages": [
+            {"role": "user", "content": PROMPT.format(rule=r["rule_text"], stats=r["stats"], final=r["final_text"])}]}})
+    b = c.messages.batches.create(requests=reqs)
+    print("rule-judge batch", b.id, len(reqs), flush=True)
+    while c.messages.batches.retrieve(b.id).processing_status != "ended":
+        time.sleep(60)
+    out = {}
+    for e in c.messages.batches.results(b.id):
+        if e.result.type == "succeeded":
+            txt = "".join(x.text for x in e.result.message.content if x.type == "text")
+            m = re.search(r"\{.*\}", txt, re.S)
+            try:
+                out[fns[int(e.custom_id[1:])]] = json.loads(m.group(0))
+            except (AttributeError, json.JSONDecodeError):
+                pass
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True)
+    ap.add_argument("--batch", action="store_true")
     a = ap.parse_args()
     from .score import final_json
+    pre = batch_judge(a.runs) if a.batch else {}
     rows = []
     for fn in sorted(glob.glob(os.path.join(a.runs, "*__prose__*.json"))):
         r = json.load(open(fn))
         if "error" in r:
             continue
-        j = judge(r["rule_text"], r["stats"], r["final_text"])
+        j = pre.get(fn) or judge(r["rule_text"], r["stats"], r["final_text"])
         v = (final_json(r["final_text"]) or {}).get("corr_verdict")
         iv = j.get("implied_verdict")
         rows.append(dict(file=os.path.basename(fn), implied_verdict=iv, final_verdict=v, rule_used=j.get("rule_used"),
