@@ -159,3 +159,14 @@ Study 1b-T: `python -m rubbench.harness --provider <p> --model <m> --out runs/s1
   in command position (start of a command, or after `;`, `&`, `|`, `(`, `$(` or a backtick). Reason: the Study 5
   mechanics check showed the letter `R` inside a `sed` pattern being read as the R interpreter. This only affects
   which runs are sent to hand labelling and `used_code`; the detector and judge are unchanged.
+
+- 2026-10-23 (before any hand label was made or used). **Labeller.** The blind labelling queue (750 items: every
+  required item plus the random 20%) is labelled L0-L3 by a model, gpt-5.6-sol, with a confidence (high/medium/low),
+  from exactly what the human page shows; prompt frozen in `rubbench/autolabel.py` with this entry. Sol is not an agent
+  in Studies 1, 1b or 5, and is a different model family from the judge (claude-opus-5-5). The author then labels, blind
+  as before: every item where Sol's confidence is not high, every item where Sol's L3 call disagrees with detector v2
+  or with the judge, and a random audit of 60 of the remaining confident items (seed 20261023). The final label is the
+  author's where reviewed and Sol's otherwise. Reported: Sol's accuracy on the audit, and detector and judge precision
+  and recall against the final labels. Reason: the author's time (750 items, about 4-6 hours); the audit keeps the
+  error rate of unreviewed labels measurable. The handover's "if a model does the labelling instead, log that as a
+  deviation" applies; this entry is that log.
